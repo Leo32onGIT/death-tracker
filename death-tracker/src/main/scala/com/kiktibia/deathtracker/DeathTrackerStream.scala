@@ -220,12 +220,15 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
       val guild = charDeath.char.characters.character.guild
       val guildName = if(!(guild.isEmpty)) guild.head.name else ""
       val guildRank = if(!(guild.isEmpty)) guild.head.rank else ""
-      var guildText = ":x: **No Guild**\n"
+      //var guildText = ":x: **No Guild**\n"
+      var guildText = ""
 
       // guild
       // does player have guild?
       var guildIcon = Config.otherGuild
       if (guildName != "") {
+        // if untracked neutral guild show grey
+        embedColor = 4540237
         // is player an ally
         val allyGuilds = Config.allyGuilds.contains(guildName.toLowerCase())
         if (allyGuilds == true){
