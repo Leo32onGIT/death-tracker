@@ -228,7 +228,9 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
       var guildIcon = Config.otherGuild
       if (guildName != "") {
         // if untracked neutral guild show grey
-        embedColor = 4540237
+        if (embedColor == 3092790){
+          embedColor = 4540237
+        }
         // is player an ally
         val allyGuilds = Config.allyGuilds.contains(guildName.toLowerCase())
         if (allyGuilds == true){
