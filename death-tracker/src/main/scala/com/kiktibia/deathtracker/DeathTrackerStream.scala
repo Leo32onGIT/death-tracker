@@ -267,7 +267,7 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
       val poke = Config.notableCreatures.contains(killer.toLowerCase())
       if (poke == true) {
         notablePoke = Config.notableRole
-        embedColor = 4922769 // bright purple
+        embedColor = 11563775 // bright purple
       }
 
       val epochSecond = ZonedDateTime.parse(charDeath.death.time).toEpochSecond
