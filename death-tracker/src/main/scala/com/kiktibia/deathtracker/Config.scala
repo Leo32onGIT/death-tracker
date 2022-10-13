@@ -55,6 +55,8 @@ object Config {
   val feruBosses: List[String] = root.getStringList("feru-bosses").asScala.toList
   val inqEmoji: String = root.getString("inq-emoji")
   val inqBosses: List[String] = root.getStringList("inq-bosses").asScala.toList
+  val kilmareshEmoji: String = root.getString("kilmaresh-emoji")
+  val kilmareshBosses: List[String] = root.getStringList("kilmaresh-bosses").asScala.toList
 
   // pvp
   val inqBlessRole: String = root.getString("inqbless-role")

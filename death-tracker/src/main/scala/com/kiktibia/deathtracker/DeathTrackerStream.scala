@@ -177,6 +177,9 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
             if (Config.inqBosses.contains(k.name.toLowerCase())){
               bossIcon = Config.inqEmoji ++ " "
             }
+            if (Config.kilmareshBosses.contains(k.name.toLowerCase())){
+              bossIcon = Config.kilmareshEmoji ++ " "
+            }
             // add "an" or "a" depending on first letter of creatures name
             // ignore capitalized names (nouns) as they are bosses
             if (!(k.name.exists(_.isUpper))){
