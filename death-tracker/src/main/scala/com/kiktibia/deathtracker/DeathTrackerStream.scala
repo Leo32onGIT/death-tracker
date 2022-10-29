@@ -191,6 +191,10 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
                 case "u" => "an "
                 case _ => "a "
               }
+              // if player dies to 'death' it should just say death not 'a death'
+              if (k.name == "death") {
+                vowelCheck = ""
+              }
             }
             killerBuffer += s"$vowelCheck$bossIcon**${k.name}**"
           }
