@@ -192,7 +192,7 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
                 case _ => "a "
               }
               // if player dies to 'death' it should just say death not 'a death'
-              if (k.name == "death") {
+              if (k.name == "death" || k.name == "a trap") {
                 vowelCheck = ""
               }
             }
