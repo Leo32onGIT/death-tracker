@@ -192,7 +192,7 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
                 case "o" => "an "
                 case "u" => "an "
                 case _ if elements.contains(k.name) => ""
-                case _ => ""
+                case _ => "a "
               }
             }
             killerBuffer += s"$vowelCheck$bossIcon**${k.name}**"
