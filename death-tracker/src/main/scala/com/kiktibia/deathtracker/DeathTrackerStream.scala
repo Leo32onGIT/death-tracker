@@ -182,18 +182,17 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
             }
             // add "an" or "a" depending on first letter of creatures name
             // ignore capitalized names (nouns) as they are bosses
+            // if player dies to a neutral source show 'died by energy' instead of 'died by an energy'
             if (!(k.name.exists(_.isUpper))){
+              val elements = List("death", "earth", "energy", "fire", "ice", "holy", "a trap", "agony")
               vowelCheck = k.name.take(1) match {
                 case "a" => "an "
                 case "e" => "an "
                 case "i" => "an "
                 case "o" => "an "
                 case "u" => "an "
-                case _ => "a "
-              }
-              // if player dies to 'death' it should just say death not 'a death'
-              if (k.name == "death" || k.name == "a trap") {
-                vowelCheck = ""
+                case _ if elements.contains(k.name) => ""
+                case _ => ""
               }
             }
             killerBuffer += s"$vowelCheck$bossIcon**${k.name}**"
