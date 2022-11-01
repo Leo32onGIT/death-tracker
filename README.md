@@ -32,4 +32,5 @@ TOKEN=XXXXXXXXXXXXXXXXXXXXXX
 GUILD_ID=XXXXXXXXXXXXXXXXXXX   
 DEATHS_CHANNEL_ID=XXXXXXXXXXXXXXXXXXX
 ```
-1. Run the docker container, pointing to the env file created in step 1: `docker run --rm -d --env-file prod.env --name death-tracker <image_id>`
+2. Run the docker container, pointing to the env file created in step 1:    
+`docker run --rm -d --env-file prod.env --name death-tracker <image_id>`
