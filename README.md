@@ -26,5 +26,10 @@ Copy to server
 1. `docker save <image_id> | bzip2 | ssh bots docker load`
 
 On the server
-1. Create an env file with the missing data from `src/main/resources/application.conf`
+1. Create an `prod.env` file with the discord server/channel id & bot authentication token:
+```
+TOKEN=XXXXXXXXXXXXXXXXXXXXXX   
+GUILD_ID=XXXXXXXXXXXXXXXXXXX   
+DEATHS_CHANNEL_ID=XXXXXXXXXXXXXXXXXXX
+```
 1. Run the docker container, pointing to the env file created in step 1: `docker run --rm -d --env-file prod.env --name death-tracker <image_id>`
