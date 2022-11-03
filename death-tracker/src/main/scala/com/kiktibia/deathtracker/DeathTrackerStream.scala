@@ -186,12 +186,12 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
             if (!(k.name.exists(_.isUpper))){
               val elements = List("death", "earth", "energy", "fire", "ice", "holy", "a trap", "agony")
               vowelCheck = k.name.take(1) match {
+                case _ if elements.contains(k.name) => ""
                 case "a" => "an "
                 case "e" => "an "
                 case "i" => "an "
                 case "o" => "an "
                 case "u" => "an "
-                case _ if elements.contains(k.name) => ""
                 case _ => "a "
               }
             }
