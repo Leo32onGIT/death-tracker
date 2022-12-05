@@ -98,7 +98,6 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
       var context = "Died"
       var embedColor = 3092790 // background default
       var embedThumbnail = creatureImageUrl(killer)
-      var bossIcon = ""
       var vowelCheck = "" // this is for adding "an" or "a" in front of creature names
       var killerBuffer = ListBuffer[String]()
       var exivaBuffer = ListBuffer[String]()
@@ -134,52 +133,30 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
               }
             }
           } else {
-            // custom emojis for flavour - ill convert this to a foreach when im not lazy
-            if (Config.nemesisCreatures.contains(k.name.toLowerCase())){
-              bossIcon = Config.nemesisEmoji ++ " "
-            }
-            if (Config.archfoeCreatures.contains(k.name.toLowerCase())){
-              bossIcon = Config.archfoeEmoji ++ " "
-            }
-            if (Config.baneCreatures.contains(k.name.toLowerCase())){
-              bossIcon = Config.baneEmoji ++ " "
-            }
-            if (Config.bossSummons.contains(k.name.toLowerCase())){
-              bossIcon = Config.summonEmoji ++ " "
-            }
-            if (Config.cubeBosses.contains(k.name.toLowerCase())){
-              bossIcon = Config.cubeEmoji ++ " "
-            }
-            if (Config.mkBosses.contains(k.name.toLowerCase())){
-              bossIcon = Config.mkEmoji ++ " "
-            }
-            if (Config.svarGreenBosses.contains(k.name.toLowerCase())){
-              bossIcon = Config.svarGreenEmoji ++ " "
-            }
-            if (Config.svarScrapperBosses.contains(k.name.toLowerCase())){
-              bossIcon = Config.svarScrapperEmoji ++ " "
-            }
-            if (Config.svarWarlordBosses.contains(k.name.toLowerCase())){
-              bossIcon = Config.svarWarlordEmoji ++ " "
-            }
-            if (Config.zelosBosses.contains(k.name.toLowerCase())){
-              bossIcon = Config.zelosEmoji ++ " "
-            }
-            if (Config.libBosses.contains(k.name.toLowerCase())){
-              bossIcon = Config.libEmoji ++ " "
-            }
-            if (Config.hodBosses.contains(k.name.toLowerCase())){
-              bossIcon = Config.hodEmoji ++ " "
-            }
-            if (Config.feruBosses.contains(k.name.toLowerCase())){
-              bossIcon = Config.feruEmoji ++ " "
-            }
-            if (Config.inqBosses.contains(k.name.toLowerCase())){
-              bossIcon = Config.inqEmoji ++ " "
-            }
-            if (Config.kilmareshBosses.contains(k.name.toLowerCase())){
-              bossIcon = Config.kilmareshEmoji ++ " "
-            }
+            // custom emojis for flavour
+            // map boss lists to their respesctive emojis
+            val creatureEmojis: Map[List[String], String] = Map(
+              Config.nemesisCreatures -> Config.nemesisEmoji,
+              Config.archfoeCreatures -> Config.archfoeEmoji,
+              Config.baneCreatures -> Config.baneEmoji,
+              Config.bossSummons -> Config.summonEmoji,
+              Config.cubeBosses -> Config.cubeEmoji,
+              Config.mkBosses -> Config.mkEmoji,
+              Config.svarGreenBosses -> Config.svarGreenEmoji,
+              Config.svarScrapperBosses -> Config.svarScrapperEmoji,
+              Config.svarWarlordBosses -> Config.svarWarlordEmoji,
+              Config.zelosBosses -> Config.zelosEmoji,
+              Config.libBosses -> Config.libEmoji,
+              Config.hodBosses -> Config.hodEmoji,
+              Config.feruBosses -> Config.feruEmoji,
+              Config.inqBosses -> Config.inqEmoji,
+              Config.kilmareshBosses -> Config.kilmareshEmoji
+            )
+            // assign the appropriate emoji
+            val bossIcon = creatureEmojis.find {
+              case (creatures, emoji) => creatures.contains(k.name.toLowerCase())
+            }.map(_._2).getOrElse("")
+
             // add "an" or "a" depending on first letter of creatures name
             // ignore capitalized names (nouns) as they are bosses
             // if player dies to a neutral source show 'died by energy' instead of 'died by an energy'
