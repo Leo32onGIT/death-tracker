@@ -215,13 +215,13 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
           embedColor = 4540237
         }
         // is player an ally
-        val allyGuilds = Config.allyGuilds.contains(guildName.toLowerCase())
+        val allyGuilds = BotApp.allyGuildsList.contains(guildName.toLowerCase())
         if (allyGuilds == true){
           embedColor = 13773097 // bright red
           guildIcon = Config.allyGuild
         }
         // is player in hunted guild
-        val huntedGuilds = Config.huntedGuilds.contains(guildName.toLowerCase())
+        val huntedGuilds = BotApp.huntedGuildsList.contains(guildName.toLowerCase())
         if (huntedGuilds == true){
           embedColor = 36941 // bright green
           if (context == "Died" && charDeath.death.level.toInt >= 250) {
@@ -233,12 +233,12 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
 
       // player
       // ally player
-      val allyPlayers = Config.allyPlayers.contains(charName.toLowerCase())
+      val allyPlayers = BotApp.allyPlayersList.contains(charName.toLowerCase())
       if (allyPlayers == true){
         embedColor = 13773097 // bright red
       }
       // hunted player
-      val huntedPlayers = Config.huntedPlayers.contains(charName.toLowerCase())
+      val huntedPlayers = BotApp.huntedPlayersList.contains(charName.toLowerCase())
       if (huntedPlayers == true){
         embedColor = 36941 // bright green
         if (context == "Died") {

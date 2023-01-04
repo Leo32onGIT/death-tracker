@@ -5,59 +5,61 @@ import com.typesafe.config.ConfigFactory
 import scala.jdk.CollectionConverters._
 
 object Config {
-  private val root = ConfigFactory.load().getConfig("death-tracker")
+  private val discord = ConfigFactory.load().getConfig("discord-config")
+  private val mappings = ConfigFactory.load().getConfig("mapping-config")
 
-  val token: String = root.getString("token")
-  val guildId: String = root.getString("guild-id")
-  val deathsChannelId: String = root.getString("deaths-channel-id")
-  val creatureUrlMappings: Map[String, String] = root.getObject("creature-url-mappings").asScala.map {
+  val token: String = discord.getString("token")
+  val guildId: String = discord.getString("guild-id")
+  val deathsChannelId: String = discord.getString("deaths-channel-id")
+
+  val creatureUrlMappings: Map[String, String] = mappings.getObject("creature-url-mappings").asScala.map {
     case (k, v) => k -> v.unwrapped().toString
   }.toMap
 
-  // nemesis filter
-  val notableCreatures: List[String] = root.getStringList("notable-creatures").asScala.toList
-  val nemesisCreatures: List[String] = root.getStringList("nemesis-creatures").asScala.toList
-  val archfoeCreatures: List[String] = root.getStringList("archfoe-creatures").asScala.toList
-  val baneCreatures: List[String] = root.getStringList("bane-creatures").asScala.toList
-  val notableRole: String = root.getString("notable-role")
-  val nemesisEmoji: String = root.getString("nemesis-emoji")
-  val archfoeEmoji: String = root.getString("archfoe-emoji")
-  val baneEmoji: String = root.getString("bane-emoji")
-  val summonEmoji: String = root.getString("summon-emoji")
+  // discord config
+  val huntedPlayersConfigChannel: String = discord.getString("hunted-players-config-channel")
+  val huntedGuildsConfigChannel: String = discord.getString("hunted-guilds-config-channel")
+  val allyPlayersConfigChannel: String = discord.getString("ally-players-config-channel")
+  val allyGuildsConfigChannel: String = discord.getString("ally-guild-config-channel")
 
-  // hunted
-  val huntedGuilds: List[String] = root.getStringList("hunted-guilds").asScala.toList
-  val allyGuilds: List[String] = root.getStringList("ally-guilds").asScala.toList
-  val huntedPlayers: List[String] = root.getStringList("hunted-players").asScala.toList
-  val allyPlayers: List[String] = root.getStringList("ally-players").asScala.toList
-  val bossSummons: List[String] = root.getStringList("boss-summons").asScala.toList
-  val allyGuild: String = root.getString("allyguild-emoji")
-  val otherGuild: String = root.getString("otherguild-emoji")
+  // roles
+  val notableRole: String = discord.getString("notable-role")
+  val inqBlessRole: String = discord.getString("inqbless-role")
 
-  // quests
-  val mkEmoji: String = root.getString("mk-emoji")
-  val mkBosses: List[String] = root.getStringList("mk-bosses").asScala.toList
-  val cubeEmoji: String = root.getString("cube-emoji")
-  val cubeBosses: List[String] = root.getStringList("cube-bosses").asScala.toList
-  val svarGreenEmoji: String = root.getString("svar-green-emoji")
-  val svarGreenBosses: List[String] = root.getStringList("svar-green-bosses").asScala.toList
-  val svarScrapperEmoji: String = root.getString("svar-scrapper-emoji")
-  val svarScrapperBosses: List[String] = root.getStringList("svar-scrapper-bosses").asScala.toList
-  val svarWarlordEmoji: String = root.getString("svar-warlord-emoji")
-  val svarWarlordBosses: List[String] = root.getStringList("svar-warlord-bosses").asScala.toList
-  val zelosEmoji: String = root.getString("zelos-emoji")
-  val zelosBosses: List[String] = root.getStringList("zelos-bosses").asScala.toList
-  val libEmoji: String = root.getString("library-emoji")
-  val libBosses: List[String] = root.getStringList("library-bosses").asScala.toList
-  val hodEmoji: String = root.getString("hod-emoji")
-  val hodBosses: List[String] = root.getStringList("hod-bosses").asScala.toList
-  val feruEmoji: String = root.getString("feru-emoji")
-  val feruBosses: List[String] = root.getStringList("feru-bosses").asScala.toList
-  val inqEmoji: String = root.getString("inq-emoji")
-  val inqBosses: List[String] = root.getStringList("inq-bosses").asScala.toList
-  val kilmareshEmoji: String = root.getString("kilmaresh-emoji")
-  val kilmareshBosses: List[String] = root.getStringList("kilmaresh-bosses").asScala.toList
+  // emojis
+  val nemesisEmoji: String = discord.getString("nemesis-emoji")
+  val archfoeEmoji: String = discord.getString("archfoe-emoji")
+  val baneEmoji: String = discord.getString("bane-emoji")
+  val summonEmoji: String = discord.getString("summon-emoji")
+  val allyGuild: String = discord.getString("allyguild-emoji")
+  val otherGuild: String = discord.getString("otherguild-emoji")
+  val mkEmoji: String = discord.getString("mk-emoji")
+  val cubeEmoji: String = discord.getString("cube-emoji")
+  val svarGreenEmoji: String = discord.getString("svar-green-emoji")
+  val svarScrapperEmoji: String = discord.getString("svar-scrapper-emoji")
+  val svarWarlordEmoji: String = discord.getString("svar-warlord-emoji")
+  val zelosEmoji: String = discord.getString("zelos-emoji")
+  val libEmoji: String = discord.getString("library-emoji")
+  val hodEmoji: String = discord.getString("hod-emoji")
+  val feruEmoji: String = discord.getString("feru-emoji")
+  val inqEmoji: String = discord.getString("inq-emoji")
+  val kilmareshEmoji: String = discord.getString("kilmaresh-emoji")
 
-  // pvp
-  val inqBlessRole: String = root.getString("inqbless-role")
+  // creature mappings
+  val notableCreatures: List[String] = mappings.getStringList("notable-creatures").asScala.toList
+  val bossSummons: List[String] = mappings.getStringList("boss-summons").asScala.toList
+  val nemesisCreatures: List[String] = mappings.getStringList("nemesis-creatures").asScala.toList
+  val archfoeCreatures: List[String] = mappings.getStringList("archfoe-creatures").asScala.toList
+  val baneCreatures: List[String] = mappings.getStringList("bane-creatures").asScala.toList
+  val mkBosses: List[String] = mappings.getStringList("mk-bosses").asScala.toList
+  val cubeBosses: List[String] = mappings.getStringList("cube-bosses").asScala.toList
+  val svarGreenBosses: List[String] = mappings.getStringList("svar-green-bosses").asScala.toList
+  val svarScrapperBosses: List[String] = mappings.getStringList("svar-scrapper-bosses").asScala.toList
+  val svarWarlordBosses: List[String] = mappings.getStringList("svar-warlord-bosses").asScala.toList
+  val zelosBosses: List[String] = mappings.getStringList("zelos-bosses").asScala.toList
+  val libBosses: List[String] = mappings.getStringList("library-bosses").asScala.toList
+  val hodBosses: List[String] = mappings.getStringList("hod-bosses").asScala.toList
+  val feruBosses: List[String] = mappings.getStringList("feru-bosses").asScala.toList
+  val inqBosses: List[String] = mappings.getStringList("inq-bosses").asScala.toList
+  val kilmareshBosses: List[String] = mappings.getStringList("kilmaresh-bosses").asScala.toList
 }
