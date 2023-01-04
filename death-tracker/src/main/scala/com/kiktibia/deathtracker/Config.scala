@@ -20,7 +20,7 @@ object Config {
   val huntedPlayersConfigChannel: String = discord.getString("hunted-players-config-channel")
   val huntedGuildsConfigChannel: String = discord.getString("hunted-guilds-config-channel")
   val allyPlayersConfigChannel: String = discord.getString("ally-players-config-channel")
-  val allyGuildsConfigChannel: String = discord.getString("ally-guild-config-channel")
+  val allyGuildsConfigChannel: String = discord.getString("ally-guilds-config-channel")
 
   // roles
   val notableRole: String = discord.getString("notable-role")
