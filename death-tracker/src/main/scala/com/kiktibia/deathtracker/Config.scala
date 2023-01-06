@@ -17,10 +17,8 @@ object Config {
   }.toMap
 
   // discord config
-  val huntedPlayersConfigChannel: String = discord.getString("hunted-players-config-channel")
-  val huntedGuildsConfigChannel: String = discord.getString("hunted-guilds-config-channel")
-  val allyPlayersConfigChannel: String = discord.getString("ally-players-config-channel")
-  val allyGuildsConfigChannel: String = discord.getString("ally-guilds-config-channel")
+  val configChannelsCategory: String = discord.getString("config-channels")
+  val onlineChannelsCategory: String = discord.getString("online-channels")
 
   // roles
   val notableRole: String = discord.getString("notable-role")
@@ -33,6 +31,9 @@ object Config {
   val summonEmoji: String = discord.getString("summon-emoji")
   val allyGuild: String = discord.getString("allyguild-emoji")
   val otherGuild: String = discord.getString("otherguild-emoji")
+  val noGuild: String = discord.getString("noguild-emoji")
+  val enemyGuild: String = discord.getString("enemyguild-emoji")
+  val enemy: String = discord.getString("enemy-emoji")
   val mkEmoji: String = discord.getString("mk-emoji")
   val cubeEmoji: String = discord.getString("cube-emoji")
   val svarGreenEmoji: String = discord.getString("svar-green-emoji")

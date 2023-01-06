@@ -6,6 +6,8 @@ import net.dv8tion.jda.api.JDABuilder
 import net.dv8tion.jda.api.entities.Guild
 import net.dv8tion.jda.api.entities.Message
 import net.dv8tion.jda.api.entities.TextChannel
+import net.dv8tion.jda.api.JDA
+import net.dv8tion.jda.api.entities.Category
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent
 import net.dv8tion.jda.api.interactions.commands.Command.Choice
 import net.dv8tion.jda.api.interactions.commands.OptionType
@@ -32,20 +34,26 @@ object BotApp extends App with StrictLogging {
   logger.info("JDA ready")
 
   private val guild: Guild = jda.getGuildById(Config.guildId)
-
   private val deathsChannel = guild.getTextChannelById(Config.deathsChannelId)
   private val deathTrackerStream = new DeathTrackerStream(deathsChannel)
 
   // hunted/ally players channels
-  private val huntedPlayersChannel = guild.getTextChannelsByName(Config.huntedPlayersConfigChannel,true).get(0)
-  private val huntedGuildsChannel = guild.getTextChannelsByName(Config.huntedGuildsConfigChannel,true).get(0)
-  private val allyPlayersChannel = guild.getTextChannelsByName(Config.allyPlayersConfigChannel,true).get(0)
-  private val allyGuildsChannel = guild.getTextChannelsByName(Config.allyGuildsConfigChannel,true).get(0)
+  val configCategory = getCategoryByName(Config.configChannelsCategory)
+
+  private val huntedPlayersChannel = getTextChannelFromCategory(configCategory, "hunted-players")
+  private val huntedGuildsChannel = getTextChannelFromCategory(configCategory, "hunted-guilds")
+  private val allyPlayersChannel = getTextChannelFromCategory(configCategory, "allied-players")
+  private val allyGuildsChannel = getTextChannelFromCategory(configCategory, "allied-guilds")
 
   var huntedPlayersList = getMessagesInChannel(huntedPlayersChannel)
   var huntedGuildsList = getMessagesInChannel(huntedGuildsChannel)
   var allyPlayersList = getMessagesInChannel(allyPlayersChannel)
   var allyGuildsList = getMessagesInChannel(allyGuildsChannel)
+
+  val onlineCategory = getCategoryByName(Config.onlineChannelsCategory)
+  val onlineAllies = getTextChannelFromCategory(onlineCategory, "allies")
+  val onlineNeutrals = getTextChannelFromCategory(onlineCategory, "neutrals")
+  val onlineEnemies = getTextChannelFromCategory(onlineCategory, "enemies")
 
   // get all messages (max 100) from these channels to compile into the lists
   def getMessagesInChannel(channel: TextChannel): List[String] = {
@@ -66,6 +74,19 @@ object BotApp extends App with StrictLogging {
 
   private val commands = List(command)
   guild.updateCommands().addCommands(commands.asJava).complete()
+
+  def getCategoryByName(categoryName: String): Option[Category] = {
+    val categories = jda.getCategories().asScala
+    val targetCategory = categories.find(_.getName.toLowerCase() == categoryName)
+    targetCategory
+  }
+
+  def getTextChannelFromCategory(category: Option[Category], channelName: String): TextChannel = {
+    val cat = category.getOrElse(return null)
+    val textChannels = cat.getTextChannels().asScala
+    val targetChannel = textChannels.find(channel => channel.getName.matches(s"$channelName(-|-[0-9]+)?")).getOrElse(return null)
+    targetChannel
+  }
 
   def reload(): MessageEmbed = {
     logger.info("reload command has been called")

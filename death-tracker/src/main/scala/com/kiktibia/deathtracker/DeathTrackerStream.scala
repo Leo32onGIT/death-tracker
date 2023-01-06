@@ -9,6 +9,10 @@ import com.kiktibia.deathtracker.tibiadata.response.{CharacterResponse, Deaths, 
 import com.typesafe.scalalogging.StrictLogging
 import net.dv8tion.jda.api.EmbedBuilder
 import net.dv8tion.jda.api.entities.TextChannel
+import net.dv8tion.jda.api.entities.Channel
+import net.dv8tion.jda.api.entities.ChannelType
+import net.dv8tion.jda.api.entities.Guild
+import scala.collection.immutable.ListMap
 
 import java.time.ZonedDateTime
 import scala.collection.immutable.HashMap
@@ -17,16 +21,21 @@ import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters._
+import java.util.Collections
 
 class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionContextExecutor, mat: Materializer) extends StrictLogging {
 
   // A date-based "key" for a character, used to track recent deaths and recent online entries
   case class CharKey(char: String, time: ZonedDateTime)
 
+  case class CurrentOnline(name: String, level: Int, vocation: String, guild: String)
+
   case class CharDeath(char: CharacterResponse, death: Deaths)
 
   private val recentDeaths = mutable.Set.empty[CharKey]
   private val recentOnline = mutable.Set.empty[CharKey]
+  private val currentOnline = mutable.Set.empty[CurrentOnline]
+  var onlineListTimer = 5
 
   private val tibiaDataClient = new TibiaDataClient()
 
@@ -49,8 +58,14 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
   private lazy val getCharacterData = Flow[WorldResponse].mapAsync(1) { worldResponse =>
     val now = ZonedDateTime.now()
     val online: List[String] = worldResponse.worlds.world.online_players.map(_.name)
+
+    // getting online data
+    val onlineWithVocLvl = worldResponse.worlds.world.online_players.map { player => (player.name, player.level.toInt, player.vocation, "") }
+    currentOnline.addAll(onlineWithVocLvl.map(i => CurrentOnline(i._1, i._2, i._3, i._4)))
+
     recentOnline.filterInPlace(i => !online.contains(i.char)) // Remove existing online chars from the list...
     recentOnline.addAll(online.map(i => CharKey(i, now))) // ...and add them again, with an updated online time
+
     val charsToCheck: Set[String] = recentOnline.map(_.char).toSet
     Source(charsToCheck).mapAsyncUnordered(24)(tibiaDataClient.getCharacter).runWith(Sink.collection).map(_.toSet)
   }.withAttributes(logAndResume)
@@ -58,6 +73,40 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
   private lazy val scanForDeaths = Flow[Set[CharacterResponse]].mapAsync(1) { characterResponses =>
     val now = ZonedDateTime.now()
     val newDeaths = characterResponses.flatMap { char =>
+
+      // gather guild icons data for online player list
+      val charName = char.characters.character.name
+      val guild = char.characters.character.guild
+      val guildName = if(!(guild.isEmpty)) guild.head.name else ""
+      var guildIcon = Config.noGuild
+      if (guildName != "") {
+        guildIcon = Config.otherGuild
+        val allyGuilds = BotApp.allyGuildsList.contains(guildName.toLowerCase())
+        if (allyGuilds == true){
+          guildIcon = Config.allyGuild
+        }
+        val huntedGuilds = BotApp.huntedGuildsList.contains(guildName.toLowerCase())
+        if (huntedGuilds == true){
+          guildIcon = Config.enemyGuild
+        }
+      }
+      val huntedPlayers = BotApp.huntedPlayersList.contains(charName.toLowerCase())
+      if (huntedPlayers == true){
+        if (guildName != "") {
+          guildIcon = Config.enemyGuild
+        } else {
+          guildIcon = Config.enemy
+        }
+      }
+      val allyPlayers = BotApp.allyPlayersList.contains(charName.toLowerCase())
+      if (allyPlayers == true){
+        guildIcon = Config.allyGuild
+      }
+      currentOnline.find(_.name == charName).foreach { onlinePlayer =>
+        currentOnline -= onlinePlayer
+        currentOnline += onlinePlayer.copy(guild = guildIcon)
+      }
+
       val deaths: List[Deaths] = char.characters.deaths.getOrElse(List.empty)
       deaths.flatMap { death =>
         val deathTime = ZonedDateTime.parse(death.time)
@@ -70,6 +119,17 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
         else None
       }
     }
+
+    // update online list
+    onlineListTimer += 1
+    if (onlineListTimer >= 5) {
+      onlineListTimer = 0
+      val currentOnlineList: List[(String, Int, String, String)] = currentOnline.map { onlinePlayer =>
+        (onlinePlayer.name, onlinePlayer.level, onlinePlayer.vocation, onlinePlayer.guild)
+      }.toList
+      onlineList(currentOnlineList)
+    }
+
     Future.successful(newDeaths)
   }.withAttributes(logAndResume)
 
@@ -264,6 +324,7 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
       embed.setThumbnail(embedThumbnail)
       embed.setColor(embedColor)
       embed.build()
+
     }
     // Send the embeds one at a time, otherwise some don't get sent if sending a lot at once
     embeds.foreach { embed =>
@@ -272,10 +333,119 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
     if (notablePoke != ""){
       deathsChannel.sendMessage(notablePoke).queue();
     }
+
     cleanUp()
 
     Future.successful()
   }.withAttributes(logAndResume)
+
+  //
+  private def onlineList(onlineData: List[(String, Int, String, String)]) {
+
+    val vocationBuffers = ListMap(
+      "druid" -> ListBuffer[(String, String)](),
+      "knight" -> ListBuffer[(String, String)](),
+      "paladin" -> ListBuffer[(String, String)](),
+      "sorcerer" -> ListBuffer[(String, String)](),
+      "none" -> ListBuffer[(String, String)]()
+    )
+
+    val sortedList = onlineData.sortWith(_._2 > _._2)
+    sortedList.foreach { player =>
+      val voc = player._3.toLowerCase.split(' ').last
+      val vocEmoji = voc match {
+        case "knight" => ":shield:"
+        case "druid" => ":snowflake:"
+        case "sorcerer" => ":fire:"
+        case "paladin" => ":bow_and_arrow:"
+        case "none" => ":hatching_chick:"
+        case _ => ""
+      }
+      vocationBuffers(voc) += ((s"${player._4}", s"${player._4} **[${player._1}](${charUrl(player._1)})** — Level ${player._2.toString} $vocEmoji"))
+    }
+
+    val alliesList: List[String] = vocationBuffers.values.flatMap(_.filter(_._1 == s"${Config.allyGuild}").map(_._2)).toList
+    val neutralsList: List[String] = vocationBuffers.values.flatMap(_.filter { case (first, _) => first == s"${Config.otherGuild}" || first == s"${Config.noGuild}" }.map(_._2)).toList
+    val enemiesList: List[String] = vocationBuffers.values.flatMap(_.filter { case (first, _) => first == s"${Config.enemyGuild}" || first == s"${Config.enemy}" }.map(_._2)).toList
+
+    val alliesCount = alliesList.size
+    val neutralsCount = neutralsList.size
+    val enemiesCount = enemiesList.size
+
+    if (BotApp.onlineAllies.getName() != s"allies-$alliesCount") {
+      val channelManager = BotApp.onlineAllies.getManager
+      channelManager.setName(s"allies-$alliesCount").queue()
+    }
+    if (BotApp.onlineNeutrals.getName() != s"neutrals-$neutralsCount") {
+      val channelManager = BotApp.onlineNeutrals.getManager
+      channelManager.setName(s"neutrals-$neutralsCount").queue()
+    }
+    if (BotApp.onlineEnemies.getName() != s"enemies-$enemiesCount") {
+      val channelManager = BotApp.onlineEnemies.getManager
+      channelManager.setName(s"enemies-$enemiesCount").queue()
+    }
+
+    if (alliesList.nonEmpty){
+      updateMultiFields(alliesList, BotApp.onlineAllies)
+    } else {
+      updateMultiFields(List("No allies are online right now."), BotApp.onlineAllies)
+    }
+    if (neutralsList.nonEmpty){
+      updateMultiFields(neutralsList, BotApp.onlineNeutrals)
+    } else {
+      updateMultiFields(List("No neutrals are online right now."), BotApp.onlineNeutrals)
+    }
+    if (enemiesList.nonEmpty){
+      updateMultiFields(enemiesList, BotApp.onlineEnemies)
+    } else {
+      updateMultiFields(List("No enemies are online right now."), BotApp.onlineEnemies)
+    }
+  }
+
+  def updateMultiFields(values: List[String], channel: TextChannel): Unit = {
+    var field = ""
+    val embedColor = 3092790
+    val messages = channel.getHistory.retrievePast(100).complete()
+    Collections.reverse(messages)
+    var currentMessage = 0
+    values.foreach { v =>
+      val currentField = field + "\n" + v
+      if (currentField.length <= 4096) { // don't add field yet, there is still room
+        field = currentField
+      }
+      else { // it's full, add the field
+        val interimEmbed = new EmbedBuilder()
+        interimEmbed.setDescription(field)
+        interimEmbed.setColor(embedColor)
+        if (currentMessage < messages.size) {
+          // edit the existing message
+          messages.get(currentMessage).editMessageEmbeds(interimEmbed.build()).queue()
+        }
+        else {
+          // there isn't an existing message to edit, so post a new one
+          channel.sendMessageEmbeds(interimEmbed.build()).queue()
+        }
+        field = v
+        currentMessage += 1
+      }
+    }
+    val finalEmbed = new EmbedBuilder()
+    finalEmbed.setDescription(field)
+    finalEmbed.setColor(embedColor)
+    if (currentMessage < messages.size) {
+      // edit the existing message
+      messages.get(currentMessage).editMessageEmbeds(finalEmbed.build()).queue()
+    }
+    else {
+      // there isn't an existing message to edit, so post a new one
+      channel.sendMessageEmbeds(finalEmbed.build()).queue()
+    }
+    if (currentMessage < messages.size - 1) {
+      // delete extra messages
+      val messagesToDelete = messages.subList(currentMessage + 1, messages.size)
+      channel.purgeMessages(messagesToDelete)
+    }
+  }
 
   // Remove players from the list who haven't logged in for a while. Remove old saved deaths.
   private def cleanUp(): Unit = {
@@ -288,6 +458,7 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
       val diff = java.time.Duration.between(i.time, now).getSeconds
       diff < deathRecentDuration
     }
+    currentOnline.clear()
   }
 
   private def vocEmoji(char: CharacterResponse): String = {
