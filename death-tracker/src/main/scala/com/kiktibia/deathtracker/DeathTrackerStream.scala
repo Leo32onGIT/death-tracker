@@ -36,6 +36,7 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
   private val recentOnline = mutable.Set.empty[CharKey]
   private val currentOnline = mutable.Set.empty[CurrentOnline]
   var onlineListTimer = 10
+  var onlineListPurgeTimer = 100
 
   private val tibiaDataClient = new TibiaDataClient()
 
@@ -385,6 +386,7 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
       channelManager.setName(s"enemies-$enemiesCount").queue()
     }
 
+    onlineListPurgeTimer += 1
     if (alliesList.nonEmpty){
       updateMultiFields(alliesList, BotApp.onlineAllies)
     } else {
@@ -400,12 +402,22 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
     } else {
       updateMultiFields(List("No enemies are online right now."), BotApp.onlineEnemies)
     }
+    if (onlineListPurgeTimer >= 100) {
+      onlineListPurgeTimer = 0
+    }
   }
 
   def updateMultiFields(values: List[String], channel: TextChannel): Unit = {
     var field = ""
     val embedColor = 3092790
-    val messages = channel.getHistory.retrievePast(100).complete()
+    var messages = channel.getHistory.retrievePast(100).complete()
+
+    // clear the channel every 25 iterations
+    if (onlineListPurgeTimer >= 100) {
+      channel.purgeMessages(messages)
+      messages = List.empty.asJava
+    }
+
     Collections.reverse(messages)
     var currentMessage = 0
     values.foreach { v =>
