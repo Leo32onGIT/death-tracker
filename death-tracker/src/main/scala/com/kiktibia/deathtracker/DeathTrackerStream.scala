@@ -35,7 +35,7 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
   private val recentDeaths = mutable.Set.empty[CharKey]
   private val recentOnline = mutable.Set.empty[CharKey]
   private val currentOnline = mutable.Set.empty[CurrentOnline]
-  var onlineListTimer = 5
+  var onlineListTimer = 10
 
   private val tibiaDataClient = new TibiaDataClient()
 
