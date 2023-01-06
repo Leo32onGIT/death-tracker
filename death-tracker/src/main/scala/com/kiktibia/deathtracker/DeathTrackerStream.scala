@@ -122,7 +122,7 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
 
     // update online list
     onlineListTimer += 1
-    if (onlineListTimer >= 5) {
+    if (onlineListTimer >= 10) {
       onlineListTimer = 0
       val currentOnlineList: List[(String, Int, String, String)] = currentOnline.map { onlinePlayer =>
         (onlinePlayer.name, onlinePlayer.level, onlinePlayer.vocation, onlinePlayer.guild)
