@@ -55,7 +55,7 @@ You will need to change this to point to your emojis and your discord roles.
 
 1. Clone the repository to your host machine: `git clone https://github.com/Leo32onGIT/death-tracker.git`
 2. Navigate tothe  folder that contains the main **build.sbt** file: `cd death-tracker`
-3. Switch to this branch: `git checkout seanera`
+3. Switch to this branch: `git checkout dev`
 4. Compile the code into a docker image: `sbt docker:publishLocal`
 5. Take note of the docker \<image id\> you just created: `docker images`   
 > ![docker image id](https://i.imgur.com/nXvSeIL.png)
