@@ -59,4 +59,10 @@ It will poke a [discord role](https://github.com/Leo32onGIT/death-tracker/blob/m
 > GUILD_ID=XXXXXXXXXXXXXXXXXXX   
 > DEATHS_CHANNEL_ID=XXXXXXXXXXXXXXXXXXX
 > ```
-5. Run the docker container you just created & parse the **prod.env** file: `docker run --rm -d --env-file prod.env <image_id>`    
+5. Run the docker container you just created & parse the **prod.env** file: `docker run --rm -d --env-file prod.env <image_id>`  
+
+## Debugging
+
+1. If something isn't working correctly you should be able to see why very clearly in the logs.
+2. Use `docker ps` to find the \<container id\> for the running bot.
+3. Use `docker logs <container id>` to view the logs.
