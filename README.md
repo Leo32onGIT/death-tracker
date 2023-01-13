@@ -39,6 +39,13 @@ It will poke a [discord role](https://github.com/Leo32onGIT/death-tracker/blob/m
 5. Ensure the bot has `View Channel`, `Manage Channel`, `Send Messages`, `Manage Messages` & `Read Message History` permissions in these channels.    
 > ![prep example](https://i.imgur.com/jBNicZI.png)
 
+#### Custom Emojis and Poke Roles
+The bot is configured to point to emojis and roles in _my_ discord server.     
+You will need to change this to point to your emojis and your discord roles.
+
+1. Open the [discord.conf](https://github.com/Leo32onGIT/death-tracker/blob/seanera/death-tracker/src/main/resources/discord.conf#L11-L34) file and edit it.
+2. Point to emoji ids and role ids that exist on _your_ discord server.
+
 #### Prepare your linux machine to host the bot
 1. Ensure `docker` is installed.
 1. Ensure `default-jre` is installed.
