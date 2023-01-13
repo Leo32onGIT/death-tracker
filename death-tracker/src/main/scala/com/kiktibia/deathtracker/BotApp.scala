@@ -37,10 +37,9 @@ object BotApp extends App with StrictLogging {
   private val deathsChannel = guild.getTextChannelById(Config.deathsChannelId)
   private val deathTrackerStream = new DeathTrackerStream(deathsChannel)
 
-  // hunted/ally players channels
-  val configCategory = getCategoryByName(Config.configChannelsCategory)
-
-  private val huntedPlayersChannel = getTextChannelFromCategory(configCategory, "hunted-players")
+  // hunted/ally players and Guilds
+  val configCategory = getCategoryByName(Config.configChannelsCategory) // this is the name of the 'category' containing the channels
+  private val huntedPlayersChannel = getTextChannelFromCategory(configCategory, "hunted-players") // this is the name of the channels
   private val huntedGuildsChannel = getTextChannelFromCategory(configCategory, "hunted-guilds")
   private val allyPlayersChannel = getTextChannelFromCategory(configCategory, "allied-players")
   private val allyGuildsChannel = getTextChannelFromCategory(configCategory, "allied-guilds")
@@ -50,8 +49,9 @@ object BotApp extends App with StrictLogging {
   var allyPlayersList = getMessagesInChannel(allyPlayersChannel)
   var allyGuildsList = getMessagesInChannel(allyGuildsChannel)
 
-  val onlineCategory = getCategoryByName(Config.onlineChannelsCategory)
-  val onlineAllies = getTextChannelFromCategory(onlineCategory, "allies")
+  // online list
+  val onlineCategory = getCategoryByName(Config.onlineChannelsCategory) // this is the name of the category' containing the channels
+  val onlineAllies = getTextChannelFromCategory(onlineCategory, "allies") // this is the name of the channels
   val onlineNeutrals = getTextChannelFromCategory(onlineCategory, "neutrals")
   val onlineEnemies = getTextChannelFromCategory(onlineCategory, "enemies")
 
