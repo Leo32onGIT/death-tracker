@@ -9,6 +9,10 @@ import com.kiktibia.deathtracker.tibiadata.response.{CharacterResponse, Deaths, 
 import com.typesafe.scalalogging.StrictLogging
 import net.dv8tion.jda.api.EmbedBuilder
 import net.dv8tion.jda.api.entities.TextChannel
+import net.dv8tion.jda.api.entities.Channel
+import net.dv8tion.jda.api.entities.ChannelType
+import net.dv8tion.jda.api.entities.Guild
+import scala.collection.immutable.ListMap
 
 import java.time.ZonedDateTime
 import scala.collection.immutable.HashMap
@@ -17,16 +21,22 @@ import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters._
+import java.util.Collections
 
 class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionContextExecutor, mat: Materializer) extends StrictLogging {
 
   // A date-based "key" for a character, used to track recent deaths and recent online entries
   case class CharKey(char: String, time: ZonedDateTime)
 
+  case class CurrentOnline(name: String, level: Int, vocation: String, guild: String)
+
   case class CharDeath(char: CharacterResponse, death: Deaths)
 
   private val recentDeaths = mutable.Set.empty[CharKey]
   private val recentOnline = mutable.Set.empty[CharKey]
+  private val currentOnline = mutable.Set.empty[CurrentOnline]
+  var onlineListTimer = 10
+  var onlineListPurgeTimer = 100
 
   private val tibiaDataClient = new TibiaDataClient()
 
@@ -39,7 +49,7 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
   }
   private val logAndResume: Attributes = supervisionStrategy(logAndResumeDecider)
 
-  private lazy val sourceTick = Source.tick(2.seconds, 120.seconds, ())
+  private lazy val sourceTick = Source.tick(2.seconds, 20.seconds, ()) // im kinda cow-boying it here
 
   private lazy val getWorld = Flow[Unit].mapAsync(1) { _ =>
     logger.info("Running stream")
@@ -49,15 +59,55 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
   private lazy val getCharacterData = Flow[WorldResponse].mapAsync(1) { worldResponse =>
     val now = ZonedDateTime.now()
     val online: List[String] = worldResponse.worlds.world.online_players.map(_.name)
+
+    // getting online data
+    val onlineWithVocLvl = worldResponse.worlds.world.online_players.map { player => (player.name, player.level.toInt, player.vocation, "") }
+    currentOnline.addAll(onlineWithVocLvl.map(i => CurrentOnline(i._1, i._2, i._3, i._4)))
+
     recentOnline.filterInPlace(i => !online.contains(i.char)) // Remove existing online chars from the list...
     recentOnline.addAll(online.map(i => CharKey(i, now))) // ...and add them again, with an updated online time
+
     val charsToCheck: Set[String] = recentOnline.map(_.char).toSet
-    Source(charsToCheck).mapAsyncUnordered(16)(tibiaDataClient.getCharacter).runWith(Sink.collection).map(_.toSet)
+    Source(charsToCheck).mapAsyncUnordered(24)(tibiaDataClient.getCharacter).runWith(Sink.collection).map(_.toSet)
   }.withAttributes(logAndResume)
 
   private lazy val scanForDeaths = Flow[Set[CharacterResponse]].mapAsync(1) { characterResponses =>
     val now = ZonedDateTime.now()
     val newDeaths = characterResponses.flatMap { char =>
+
+      // gather guild icons data for online player list
+      val charName = char.characters.character.name
+      val guild = char.characters.character.guild
+      val guildName = if(!(guild.isEmpty)) guild.head.name else ""
+      var guildIcon = Config.noGuild
+      if (guildName != "") {
+        guildIcon = Config.otherGuild
+        val allyGuilds = BotApp.allyGuildsList.contains(guildName.toLowerCase())
+        if (allyGuilds == true){
+          guildIcon = Config.allyGuild
+        }
+        val huntedGuilds = BotApp.huntedGuildsList.contains(guildName.toLowerCase())
+        if (huntedGuilds == true){
+          guildIcon = Config.enemyGuild
+        }
+      }
+      val huntedPlayers = BotApp.huntedPlayersList.contains(charName.toLowerCase())
+      if (huntedPlayers == true){
+        if (guildName != "") {
+          guildIcon = Config.enemyGuild
+        } else {
+          guildIcon = Config.enemy
+        }
+      }
+      val allyPlayers = BotApp.allyPlayersList.contains(charName.toLowerCase())
+      if (allyPlayers == true){
+        guildIcon = Config.allyGuild
+      }
+      currentOnline.find(_.name == charName).foreach { onlinePlayer =>
+        currentOnline -= onlinePlayer
+        currentOnline += onlinePlayer.copy(guild = guildIcon)
+      }
+
       val deaths: List[Deaths] = char.characters.deaths.getOrElse(List.empty)
       deaths.flatMap { death =>
         val deathTime = ZonedDateTime.parse(death.time)
@@ -70,21 +120,34 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
         else None
       }
     }
+
+    // update online list
+    onlineListTimer += 1
+    if (onlineListTimer >= 10) {
+      onlineListTimer = 0
+      val currentOnlineList: List[(String, Int, String, String)] = currentOnline.map { onlinePlayer =>
+        (onlinePlayer.name, onlinePlayer.level, onlinePlayer.vocation, onlinePlayer.guild)
+      }.toList
+      onlineList(currentOnlineList)
+    }
+
     Future.successful(newDeaths)
   }.withAttributes(logAndResume)
 
   private lazy val postToDiscordAndCleanUp = Flow[Set[CharDeath]].mapAsync(1) { charDeaths =>
 
-    // Filter only the interesting deaths (nemesis bosses, rare bestiary)
     /***
+    // Filter only the interesting deaths (nemesis bosses, rare bestiary)
     val (notableDeaths, normalDeaths) = charDeaths.toList.partition { charDeath =>
       Config.notableCreatures.exists(c => c.endsWith(charDeath.death.killers.last.name.toLowerCase))
     }
 
+    // logging
     logger.info(s"New notable deaths: ${notableDeaths.length}")
     notableDeaths.foreach(d => logger.info(s"${d.char.characters.character.name} - ${d.death.killers.last.name}"))
     logger.info(s"New normal deaths: ${normalDeaths.length}")
     normalDeaths.foreach(d => logger.info(s"${d.char.characters.character.name} - ${d.death.killers.last.name}"))
+
 
     val embeds = notableDeaths.sortBy(_.death.time).map { charDeath =>
     ***/
@@ -96,7 +159,6 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
       var context = "Died"
       var embedColor = 3092790 // background default
       var embedThumbnail = creatureImageUrl(killer)
-      var bossIcon = ""
       var vowelCheck = "" // this is for adding "an" or "a" in front of creature names
       var killerBuffer = ListBuffer[String]()
       var exivaBuffer = ListBuffer[String]()
@@ -112,7 +174,15 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
               val isSummon = k.name.split(" of ") // e.g: fire elemental of Violent Beams
               if (isSummon.length > 1){
                 if (isSummon(0).exists(_.isUpper) == false) { // summons will be lowercase, a player with " of " in their name will have a capital letter
-                  killerBuffer += s"${Config.summonEmoji} **${isSummon(0)} of [${isSummon(1)}](${charUrl(isSummon(1))})**"
+                  val vowel = isSummon(0).take(1) match {
+                  case "a" => "an"
+                  case "e" => "an"
+                  case "i" => "an"
+                  case "o" => "an"
+                  case "u" => "an"
+                  case _ => "a"
+                  }
+                  killerBuffer += s"$vowel ${Config.summonEmoji} **${isSummon(0)} of [${isSummon(1)}](${charUrl(isSummon(1))})**"
                   exivaBuffer += isSummon(1)
                 } else {
                   killerBuffer += s"**[${k.name}](${charUrl(k.name)})**" // player with " of " in the name e.g: Knight of Flame
@@ -124,53 +194,37 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
               }
             }
           } else {
-            // custom emojis for flavour - ill convert this to a foreach when im not lazy
-            if (Config.nemesisCreatures.contains(k.name.toLowerCase())){
-              bossIcon = Config.nemesisEmoji ++ " "
-            }
-            if (Config.archfoeCreatures.contains(k.name.toLowerCase())){
-              bossIcon = Config.archfoeEmoji ++ " "
-            }
-            if (Config.baneCreatures.contains(k.name.toLowerCase())){
-              bossIcon = Config.baneEmoji ++ " "
-            }
-            if (Config.bossSummons.contains(k.name.toLowerCase())){
-              bossIcon = Config.summonEmoji ++ " "
-            }
-            if (Config.cubeBosses.contains(k.name.toLowerCase())){
-              bossIcon = Config.cubeEmoji ++ " "
-            }
-            if (Config.mkBosses.contains(k.name.toLowerCase())){
-              bossIcon = Config.mkEmoji ++ " "
-            }
-            if (Config.svarGreenBosses.contains(k.name.toLowerCase())){
-              bossIcon = Config.svarGreenEmoji ++ " "
-            }
-            if (Config.svarScrapperBosses.contains(k.name.toLowerCase())){
-              bossIcon = Config.svarScrapperEmoji ++ " "
-            }
-            if (Config.svarWarlordBosses.contains(k.name.toLowerCase())){
-              bossIcon = Config.svarWarlordEmoji ++ " "
-            }
-            if (Config.zelosBosses.contains(k.name.toLowerCase())){
-              bossIcon = Config.zelosEmoji ++ " "
-            }
-            if (Config.libBosses.contains(k.name.toLowerCase())){
-              bossIcon = Config.libEmoji ++ " "
-            }
-            if (Config.hodBosses.contains(k.name.toLowerCase())){
-              bossIcon = Config.hodEmoji ++ " "
-            }
-            if (Config.feruBosses.contains(k.name.toLowerCase())){
-              bossIcon = Config.feruEmoji ++ " "
-            }
-            if (Config.inqBosses.contains(k.name.toLowerCase())){
-              bossIcon = Config.inqEmoji ++ " "
-            }
+            // custom emojis for flavour
+            // map boss lists to their respesctive emojis
+            val creatureEmojis: Map[List[String], String] = Map(
+              Config.nemesisCreatures -> Config.nemesisEmoji,
+              Config.archfoeCreatures -> Config.archfoeEmoji,
+              Config.baneCreatures -> Config.baneEmoji,
+              Config.bossSummons -> Config.summonEmoji,
+              Config.cubeBosses -> Config.cubeEmoji,
+              Config.mkBosses -> Config.mkEmoji,
+              Config.svarGreenBosses -> Config.svarGreenEmoji,
+              Config.svarScrapperBosses -> Config.svarScrapperEmoji,
+              Config.svarWarlordBosses -> Config.svarWarlordEmoji,
+              Config.zelosBosses -> Config.zelosEmoji,
+              Config.libBosses -> Config.libEmoji,
+              Config.hodBosses -> Config.hodEmoji,
+              Config.feruBosses -> Config.feruEmoji,
+              Config.inqBosses -> Config.inqEmoji,
+              Config.kilmareshBosses -> Config.kilmareshEmoji
+            )
+            // assign the appropriate emoji
+            val bossIcon = creatureEmojis.find {
+              case (creatures, emoji) => creatures.contains(k.name.toLowerCase())
+            }.map(_._2).getOrElse("")
+
             // add "an" or "a" depending on first letter of creatures name
             // ignore capitalized names (nouns) as they are bosses
+            // if player dies to a neutral source show 'died by energy' instead of 'died by an energy'
             if (!(k.name.exists(_.isUpper))){
+              val elements = List("death", "earth", "energy", "fire", "ice", "holy", "a trap", "agony", "life drain")
               vowelCheck = k.name.take(1) match {
+                case _ if elements.contains(k.name) => ""
                 case "a" => "an "
                 case "e" => "an "
                 case "i" => "an "
@@ -187,75 +241,91 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
       if (exivaBuffer.nonEmpty) {
         exivaBuffer.zipWithIndex.foreach { case (exiva, i) =>
           if (i == 0){
-            exivaList += s"""\n:red_square:`exiva "$exiva"`""" // add exiva emoji
-            // exivaList += s"""\n<:exiva:1025866744918716416>`exiva "$exiva"`"""
+            exivaList += s"""\n${Config.exivaEmoji} `exiva "$exiva"`""" // add exiva emoji
           } else {
-            exivaList += s"""\n:red_square:`exiva "$exiva"`"""
-            // exivaList += s"""\n<:indent:1025915320285798451>`exiva "$exiva"`""" // just use indent emoji for further player names
+            exivaList += s"""\n${Config.indentEmoji} `exiva "$exiva"`""" // just use indent emoji for further player names
           }
         }
       }
       // convert formatted killer list to one string
-      val killerInit = killerBuffer.view.init
-      val killerText =
+      val killerInit = if (killerBuffer.nonEmpty) killerBuffer.view.init else None
+      var killerText =
         if (killerInit.nonEmpty) {
           killerInit.mkString(", ") + " and " + killerBuffer.last
         } else killerBuffer.headOption.getOrElse("")
+
+      // this should only occur to pure suicides on bomb runes, or pure 'assists' deaths in yellow-skull friendy fire or retro/hardcore situations
+      if (killerText == ""){
+          embedThumbnail = creatureImageUrl("Red_Skull_(Item)")
+          killerText = s"""`suicide`"""
+      }
 
       // guild rank and name
       val guild = charDeath.char.characters.character.guild
       val guildName = if(!(guild.isEmpty)) guild.head.name else ""
       val guildRank = if(!(guild.isEmpty)) guild.head.rank else ""
-      var guildText = ":x: **No Guild**\n"
+      //var guildText = ":x: **No Guild**\n"
+      var guildText = ""
 
       // guild
       // does player have guild?
       var guildIcon = Config.otherGuild
       if (guildName != "") {
+        // if untracked neutral guild show grey
+        if (embedColor == 3092790){
+          embedColor = 4540237
+        }
         // is player an ally
-        val allyGuilds = Config.allyGuilds.contains(guildName.toLowerCase())
+        val allyGuilds = BotApp.allyGuildsList.contains(guildName.toLowerCase())
         if (allyGuilds == true){
           embedColor = 13773097 // bright red
           guildIcon = Config.allyGuild
         }
         // is player in hunted guild
-        val huntedGuilds = Config.huntedGuilds.contains(guildName.toLowerCase())
+        val huntedGuilds = BotApp.huntedGuildsList.contains(guildName.toLowerCase())
         if (huntedGuilds == true){
           embedColor = 36941 // bright green
+          if (context == "Died" && charDeath.death.level.toInt >= 250) {
+            notablePoke = Config.inqBlessRole // PVE fullbless opportuniy (only poke for level 250+)
+          }
         }
         guildText = s"$guildIcon *$guildRank* of the [$guildName](https://www.tibia.com/community/?subtopic=guilds&page=view&GuildName=${guildName.replace(" ", "%20")})\n"
       }
 
       // player
       // ally player
-      val allyPlayers = Config.allyPlayers.contains(charName.toLowerCase())
+      val allyPlayers = BotApp.allyPlayersList.contains(charName.toLowerCase())
       if (allyPlayers == true){
         embedColor = 13773097 // bright red
       }
       // hunted player
-      val huntedPlayers = Config.huntedPlayers.contains(charName.toLowerCase())
+      val huntedPlayers = BotApp.huntedPlayersList.contains(charName.toLowerCase())
       if (huntedPlayers == true){
         embedColor = 36941 // bright green
+        if (context == "Died") {
+          notablePoke = Config.inqBlessRole // PVE fullbless opportuniy
+        }
       }
 
       // poke if killer is in notable-creatures config
       val poke = Config.notableCreatures.contains(killer.toLowerCase())
       if (poke == true) {
         notablePoke = Config.notableRole
-        embedColor = 4922769 // bright purple
+        embedColor = 11563775 // bright purple
       }
 
       val epochSecond = ZonedDateTime.parse(charDeath.death.time).toEpochSecond
 
       // this is the actual embed description
-      val embedText = s"$guildText$context at level ${charDeath.death.level.toInt} by $killerText.\n$context at <t:$epochSecond>$exivaList"
+      val embedText = s"$guildText$context <t:$epochSecond:R> at level ${charDeath.death.level.toInt}\nby $killerText.$exivaList"
 
       val embed = new EmbedBuilder()
-      embed.setTitle(s"$charName ${vocEmoji(charDeath.char)}", charUrl(charName))
+      embed.setTitle(s"${vocEmoji(charDeath.char)} $charName ${vocEmoji(charDeath.char)}", charUrl(charName))
       embed.setDescription(embedText)
       embed.setThumbnail(embedThumbnail)
       embed.setColor(embedColor)
       embed.build()
+
     }
     // Send the embeds one at a time, otherwise some don't get sent if sending a lot at once
     embeds.foreach { embed =>
@@ -264,10 +334,130 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
     if (notablePoke != ""){
       deathsChannel.sendMessage(notablePoke).queue();
     }
+
     cleanUp()
 
     Future.successful()
   }.withAttributes(logAndResume)
+
+  //
+  private def onlineList(onlineData: List[(String, Int, String, String)]) {
+
+    val vocationBuffers = ListMap(
+      "druid" -> ListBuffer[(String, String)](),
+      "knight" -> ListBuffer[(String, String)](),
+      "paladin" -> ListBuffer[(String, String)](),
+      "sorcerer" -> ListBuffer[(String, String)](),
+      "none" -> ListBuffer[(String, String)]()
+    )
+
+    val sortedList = onlineData.sortWith(_._2 > _._2)
+    sortedList.foreach { player =>
+      val voc = player._3.toLowerCase.split(' ').last
+      val vocEmoji = voc match {
+        case "knight" => ":shield:"
+        case "druid" => ":snowflake:"
+        case "sorcerer" => ":fire:"
+        case "paladin" => ":bow_and_arrow:"
+        case "none" => ":hatching_chick:"
+        case _ => ""
+      }
+      vocationBuffers(voc) += ((s"${player._4}", s"${player._4} **[${player._1}](${charUrl(player._1)})** — Level ${player._2.toString} $vocEmoji"))
+    }
+
+    val alliesList: List[String] = vocationBuffers.values.flatMap(_.filter(_._1 == s"${Config.allyGuild}").map(_._2)).toList
+    val neutralsList: List[String] = vocationBuffers.values.flatMap(_.filter { case (first, _) => first == s"${Config.otherGuild}" || first == s"${Config.noGuild}" }.map(_._2)).toList
+    val enemiesList: List[String] = vocationBuffers.values.flatMap(_.filter { case (first, _) => first == s"${Config.enemyGuild}" || first == s"${Config.enemy}" }.map(_._2)).toList
+
+    val alliesCount = alliesList.size
+    val neutralsCount = neutralsList.size
+    val enemiesCount = enemiesList.size
+
+    if (BotApp.onlineAllies.getName() != s"allies-$alliesCount") {
+      val channelManager = BotApp.onlineAllies.getManager
+      channelManager.setName(s"allies-$alliesCount").queue()
+    }
+    if (BotApp.onlineNeutrals.getName() != s"neutrals-$neutralsCount") {
+      val channelManager = BotApp.onlineNeutrals.getManager
+      channelManager.setName(s"neutrals-$neutralsCount").queue()
+    }
+    if (BotApp.onlineEnemies.getName() != s"enemies-$enemiesCount") {
+      val channelManager = BotApp.onlineEnemies.getManager
+      channelManager.setName(s"enemies-$enemiesCount").queue()
+    }
+
+    onlineListPurgeTimer += 1
+    if (alliesList.nonEmpty){
+      updateMultiFields(alliesList, BotApp.onlineAllies)
+    } else {
+      updateMultiFields(List("No allies are online right now."), BotApp.onlineAllies)
+    }
+    if (neutralsList.nonEmpty){
+      updateMultiFields(neutralsList, BotApp.onlineNeutrals)
+    } else {
+      updateMultiFields(List("No neutrals are online right now."), BotApp.onlineNeutrals)
+    }
+    if (enemiesList.nonEmpty){
+      updateMultiFields(enemiesList, BotApp.onlineEnemies)
+    } else {
+      updateMultiFields(List("No enemies are online right now."), BotApp.onlineEnemies)
+    }
+    if (onlineListPurgeTimer >= 100) {
+      onlineListPurgeTimer = 0
+    }
+  }
+
+  def updateMultiFields(values: List[String], channel: TextChannel): Unit = {
+    var field = ""
+    val embedColor = 3092790
+    var messages = channel.getHistory.retrievePast(100).complete()
+
+    // clear the channel every 25 iterations
+    if (onlineListPurgeTimer >= 100) {
+      channel.purgeMessages(messages)
+      messages = List.empty.asJava
+    }
+
+    Collections.reverse(messages)
+    var currentMessage = 0
+    values.foreach { v =>
+      val currentField = field + "\n" + v
+      if (currentField.length <= 4096) { // don't add field yet, there is still room
+        field = currentField
+      }
+      else { // it's full, add the field
+        val interimEmbed = new EmbedBuilder()
+        interimEmbed.setDescription(field)
+        interimEmbed.setColor(embedColor)
+        if (currentMessage < messages.size) {
+          // edit the existing message
+          messages.get(currentMessage).editMessageEmbeds(interimEmbed.build()).queue()
+        }
+        else {
+          // there isn't an existing message to edit, so post a new one
+          channel.sendMessageEmbeds(interimEmbed.build()).queue()
+        }
+        field = v
+        currentMessage += 1
+      }
+    }
+    val finalEmbed = new EmbedBuilder()
+    finalEmbed.setDescription(field)
+    finalEmbed.setColor(embedColor)
+    if (currentMessage < messages.size) {
+      // edit the existing message
+      messages.get(currentMessage).editMessageEmbeds(finalEmbed.build()).queue()
+    }
+    else {
+      // there isn't an existing message to edit, so post a new one
+      channel.sendMessageEmbeds(finalEmbed.build()).queue()
+    }
+    if (currentMessage < messages.size - 1) {
+      // delete extra messages
+      val messagesToDelete = messages.subList(currentMessage + 1, messages.size)
+      channel.purgeMessages(messagesToDelete)
+    }
+  }
 
   // Remove players from the list who haven't logged in for a while. Remove old saved deaths.
   private def cleanUp(): Unit = {
@@ -280,6 +470,7 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
       val diff = java.time.Duration.between(i.time, now).getSeconds
       diff < deathRecentDuration
     }
+    currentOnline.clear()
   }
 
   private def vocEmoji(char: CharacterResponse): String = {

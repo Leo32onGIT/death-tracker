@@ -2,7 +2,7 @@ ThisBuild / version := "1.1.0-SNAPSHOT"
 
 name := "death-tracker"
 
-version := "0.1"
+version := "0.2"
 
 scalaVersion := "2.13.9"
 
@@ -18,7 +18,7 @@ libraryDependencies += "com.typesafe.akka" %% "akka-http" % AkkaHttpVersion
 libraryDependencies += "com.typesafe.akka" %% "akka-http-spray-json" % AkkaHttpVersion
 libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % "3.9.4"
 libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.10"
-libraryDependencies += "net.dv8tion" % "JDA" % "5.0.0-alpha.9"
+libraryDependencies += "net.dv8tion" % "JDA" % "5.0.0-alpha.17"
 libraryDependencies += "org.apache.commons" % "commons-text" % "1.9"
 
 libraryDependencies += "org.scalactic" %% "scalactic" % "3.2.12"

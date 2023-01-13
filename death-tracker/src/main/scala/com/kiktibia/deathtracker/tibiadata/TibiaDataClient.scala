@@ -29,8 +29,20 @@ class TibiaDataClient extends JsonSupport with StrictLogging {
   }
 
   def getCharacter(name: String): Future[CharacterResponse] = {
+
+    // yeehaw
+    var obfsName = ""
+    val rand = scala.util.Random
+    name.toLowerCase.foreach { letter =>
+      if (letter.isLetter && rand.nextBoolean() == true) {
+        obfsName += s"${letter.toUpper}"
+      } else {
+        obfsName += s"$letter"
+      }
+    }
+
     for {
-      response <- Http().singleRequest(HttpRequest(uri = s"$characterUrl${name.replaceAll(" ", "%20")}"))
+      response <- Http().singleRequest(HttpRequest(uri = s"$characterUrl${obfsName.replaceAll(" ", "%20")}"))
       decoded = decodeResponse(response)
       unmarshalled <- Unmarshal(decoded).to[CharacterResponse]
     } yield unmarshalled
