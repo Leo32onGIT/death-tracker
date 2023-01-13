@@ -34,9 +34,10 @@ It will poke a [discord role](https://github.com/Leo32onGIT/death-tracker/blob/m
 #### Prepare your Discord for the bot
 1. Create a new category called `configuration`.
 2. Create four channels in it called: `hunted-players`, `hunted-guilds`, `allied-players` & `allied-guilds`.
-3. Creaye a new category called `online`.
+3. Create a new category called `online`.
 4. Create three channels in it called: `allies`, `neutrals` & `enemies`.
-5. Ensure the bot has `View Channel`, `Manage Channel`, `Send Messages`, `Manage Messages` & `Read Message History` permissions in these channels.
+5. Ensure the bot has `View Channel`, `Manage Channel`, `Send Messages`, `Manage Messages` & `Read Message History` permissions in these channels.    
+> ![prep example](https://i.imgur.com/jBNicZI.png)
 
 #### Prepare your linux machine to host the bot
 1. Ensure `docker` is installed.
@@ -47,7 +48,7 @@ It will poke a [discord role](https://github.com/Leo32onGIT/death-tracker/blob/m
 
 1. Clone the repository to your host machine: `git clone https://github.com/Leo32onGIT/death-tracker.git`
 2. Navigate tothe  folder that contains the main **build.sbt** file: `cd death-tracker`
-3. Switch to the **seanera** branch: `git checkout seanera`
+3. Switch to this branch: `git checkout seanera`
 4. Compile the code into a docker image: `sbt docker:publishLocal`
 5. Take note of the docker \<image id\> you just created: `docker images`   
 > ![docker image id](https://i.imgur.com/nXvSeIL.png)
