@@ -27,14 +27,15 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
 
   // A date-based "key" for a character, used to track recent deaths and recent online entries
   case class CharKey(char: String, time: ZonedDateTime)
-
   case class CurrentOnline(name: String, level: Int, vocation: String, guild: String)
-
   case class CharDeath(char: CharacterResponse, death: Deaths)
+  case class CharLevel(name: String, level: Int, vocation: String, lastLogin: ZonedDateTime)
 
   private val recentDeaths = mutable.Set.empty[CharKey]
+  private val recentLevels = mutable.Set.empty[CharLevel]
   private val recentOnline = mutable.Set.empty[CharKey]
   private val currentOnline = mutable.Set.empty[CurrentOnline]
+
   var onlineListTimer = 10
   var onlineListPurgeTimer = 100
 
@@ -80,19 +81,24 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
       val guild = char.characters.character.guild
       val guildName = if(!(guild.isEmpty)) guild.head.name else ""
       var guildIcon = Config.noGuild
+      var embedColor = 3092790 // background default
       if (guildName != "") {
         guildIcon = Config.otherGuild
+        embedColor = 4540237
         val allyGuilds = BotApp.allyGuildsList.contains(guildName.toLowerCase())
         if (allyGuilds == true){
+          embedColor = 36941 // bright green
           guildIcon = Config.allyGuild
         }
         val huntedGuilds = BotApp.huntedGuildsList.contains(guildName.toLowerCase())
         if (huntedGuilds == true){
+          embedColor = 13773097 // bright red
           guildIcon = Config.enemyGuild
         }
       }
       val huntedPlayers = BotApp.huntedPlayersList.contains(charName.toLowerCase())
       if (huntedPlayers == true){
+        embedColor = 13773097 // bright red
         if (guildName != "") {
           guildIcon = Config.enemyGuild
         } else {
@@ -101,11 +107,43 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
       }
       val allyPlayers = BotApp.allyPlayersList.contains(charName.toLowerCase())
       if (allyPlayers == true){
+        embedColor = 36941 // bright green
         guildIcon = Config.allyGuild
       }
+
+      // variables for detecting new levels
+      val sheetLevel = char.characters.character.level
+      val sheetVocation = char.characters.character.vocation
+      val sheetLastLogin = ZonedDateTime.parse(char.characters.character.last_login.getOrElse("2022-01-01T01:00:00Z"))
+
       currentOnline.find(_.name == charName).foreach { onlinePlayer =>
+        // add the guild icon
         currentOnline -= onlinePlayer
         currentOnline += onlinePlayer.copy(guild = guildIcon)
+      }
+      currentOnline.find(_.name == charName).foreach { onlinePlayer =>
+        if (onlinePlayer.level > sheetLevel && now.isAfter(sheetLastLogin.plusMinutes(5))){
+          val levelsChannel = BotApp.levelsAll
+          val newCharLevel = CharLevel(charName, onlinePlayer.level, sheetVocation, sheetLastLogin)
+          val embedText = s"${vocEmoji(char)} **[$charName](${charUrl(charName)})** ${vocEmoji(char)} advanced to level **${onlinePlayer.level}**"
+          //val embedText = s"${onlinePlayer.guild} **$charName** ${vocEmoji(char)} advanced to level **${onlinePlayer.level}**."
+          if (recentLevels.exists(x => x.name == charName && x.level == onlinePlayer.level)){
+            val lastLoginInRecentLevels = recentLevels.filter(x => x.name == charName && x.level == onlinePlayer.level)
+              if (lastLoginInRecentLevels.forall(x => x.lastLogin.isBefore(sheetLastLogin))){
+                recentLevels += newCharLevel
+                val levelNotification = new EmbedBuilder()
+                levelNotification.setDescription(embedText)
+                levelNotification.setColor(embedColor)
+                levelsChannel.sendMessageEmbeds(levelNotification.build()).queue();
+              }
+          } else {
+              recentLevels += newCharLevel
+              val levelNotification = new EmbedBuilder()
+              levelNotification.setDescription(embedText)
+              levelNotification.setColor(embedColor)
+              levelsChannel.sendMessageEmbeds(levelNotification.build()).queue();
+          }
+        }
       }
 
       val deaths: List[Deaths] = char.characters.deaths.getOrElse(List.empty)

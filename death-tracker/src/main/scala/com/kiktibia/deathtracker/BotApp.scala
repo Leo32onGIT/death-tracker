@@ -55,6 +55,10 @@ object BotApp extends App with StrictLogging {
   val onlineNeutrals = getTextChannelFromCategory(onlineCategory, "neutrals")
   val onlineEnemies = getTextChannelFromCategory(onlineCategory, "enemies")
 
+  // levels feed
+  val levelCategory = getCategoryByName(Config.levelChannelsCategory) // this is the name of the category' containing the channels
+  val levelsAll = getTextChannelFromCategory(levelCategory, "all") // this is the name of the channels
+
   // get all messages (max 100) from these channels to compile into the lists
   def getMessagesInChannel(channel: TextChannel): List[String] = {
     val messageHistory = channel.getHistory

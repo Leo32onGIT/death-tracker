@@ -19,6 +19,7 @@ object Config {
   // discord config
   val configChannelsCategory: String = discord.getString("config-channels")
   val onlineChannelsCategory: String = discord.getString("online-channels")
+  val levelChannelsCategory: String = discord.getString("level-channels")
 
   // roles
   val notableRole: String = discord.getString("notable-role")
