@@ -1,6 +1,6 @@
 ThisBuild / version := "1.1.0-SNAPSHOT"
 
-name := "death-tracker-wizera"
+name := "wizera-bot"
 
 version := "0.2"
 
