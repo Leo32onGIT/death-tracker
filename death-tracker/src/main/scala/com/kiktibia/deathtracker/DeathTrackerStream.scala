@@ -255,6 +255,7 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
           if (k.player == true) {
             if (k.name != charName){ // ignore 'self' entries on deathlist
               context = "Killed"
+              notablePoke = "" // reset poke as its not a fullbless
               if (embedColor == 3092790 || embedColor == 4540237){
                 embedColor = 14869218 // bone white
               }
