@@ -130,11 +130,11 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
             val lastLoginInRecentLevels = recentLevels.filter(x => x.name == charName && x.level == onlinePlayer.level)
               if (lastLoginInRecentLevels.forall(x => x.lastLogin.isBefore(sheetLastLogin))){
                 recentLevels += newCharLevel
-                createAndSendWebhookMessage(levelChannel, webhookMessage, "Seanera")
+                createAndSendWebhookMessage(levelChannel, webhookMessage, "Wizera")
               }
           } else {
               recentLevels += newCharLevel
-              createAndSendWebhookMessage(levelChannel, webhookMessage, "Seanera")
+              createAndSendWebhookMessage(levelChannel, webhookMessage, "Wizera")
           }
         }
       }
