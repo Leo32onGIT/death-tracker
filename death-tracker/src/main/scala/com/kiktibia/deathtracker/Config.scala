@@ -10,7 +10,6 @@ object Config {
 
   val token: String = discord.getString("token")
   val guildId: String = discord.getString("guild-id")
-  val deathsChannelId: String = discord.getString("deaths-channel-id")
 
   val creatureUrlMappings: Map[String, String] = mappings.getObject("creature-url-mappings").asScala.map {
     case (k, v) => k -> v.unwrapped().toString
@@ -18,8 +17,7 @@ object Config {
 
   // discord config
   val configChannelsCategory: String = discord.getString("config-channels")
-  val onlineChannelsCategory: String = discord.getString("online-channels")
-  val levelChannelsCategory: String = discord.getString("level-channels")
+  val worldChannelsCategory: String = discord.getString("world-channels")
 
   // roles
   val notableRole: String = discord.getString("notable-role")

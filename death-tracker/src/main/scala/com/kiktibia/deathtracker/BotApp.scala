@@ -34,8 +34,6 @@ object BotApp extends App with StrictLogging {
   logger.info("JDA ready")
 
   private val guild: Guild = jda.getGuildById(Config.guildId)
-  private val deathsChannel = guild.getTextChannelById(Config.deathsChannelId)
-  private val deathTrackerStream = new DeathTrackerStream(deathsChannel)
 
   // hunted/ally players and Guilds
   val configCategory = getCategoryByName(Config.configChannelsCategory) // this is the name of the 'category' containing the channels
@@ -50,14 +48,15 @@ object BotApp extends App with StrictLogging {
   var allyGuildsList = getMessagesInChannel(allyGuildsChannel)
 
   // online list
-  val onlineCategory = getCategoryByName(Config.onlineChannelsCategory) // this is the name of the category' containing the channels
-  val onlineAllies = getTextChannelFromCategory(onlineCategory, "allies") // this is the name of the channels
-  val onlineNeutrals = getTextChannelFromCategory(onlineCategory, "neutrals")
-  val onlineEnemies = getTextChannelFromCategory(onlineCategory, "enemies")
+  val worldCategory = getCategoryByName(Config.worldChannelsCategory) // this is the name of the category' containing the channels
+  val onlineAllies = getTextChannelFromCategory(worldCategory, "allies") // this is the name of the channels
+  val onlineNeutrals = getTextChannelFromCategory(worldCategory, "neutrals")
+  val onlineEnemies = getTextChannelFromCategory(worldCategory, "enemies")
 
   // levels feed
-  val levelCategory = getCategoryByName(Config.levelChannelsCategory) // this is the name of the category' containing the channels
-  val levelsAll = getTextChannelFromCategory(levelCategory, "all") // this is the name of the channels
+  val levelsAll = getTextChannelFromCategory(worldCategory, "levels") // this is the name of the channels
+  private val deathsChannel = getTextChannelFromCategory(worldCategory, "deaths")
+  private val deathTrackerStream = new DeathTrackerStream(deathsChannel)
 
   // get all messages (max 100) from these channels to compile into the lists
   def getMessagesInChannel(channel: TextChannel): List[String] = {
