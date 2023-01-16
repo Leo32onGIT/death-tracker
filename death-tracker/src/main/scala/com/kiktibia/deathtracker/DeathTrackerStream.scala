@@ -11,8 +11,11 @@ import net.dv8tion.jda.api.EmbedBuilder
 import net.dv8tion.jda.api.entities.TextChannel
 import net.dv8tion.jda.api.entities.Channel
 import net.dv8tion.jda.api.entities.ChannelType
+import net.dv8tion.jda.api.entities.Webhook
 import net.dv8tion.jda.api.entities.Guild
 import scala.collection.immutable.ListMap
+import club.minnced.discord.webhook.WebhookClient
+import club.minnced.discord.webhook.send.WebhookMessageBuilder
 
 import java.time.ZonedDateTime
 import scala.collection.immutable.HashMap
@@ -27,14 +30,15 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
 
   // A date-based "key" for a character, used to track recent deaths and recent online entries
   case class CharKey(char: String, time: ZonedDateTime)
-
   case class CurrentOnline(name: String, level: Int, vocation: String, guild: String)
-
   case class CharDeath(char: CharacterResponse, death: Deaths)
+  case class CharLevel(name: String, level: Int, vocation: String, lastLogin: ZonedDateTime, time: ZonedDateTime)
 
   private val recentDeaths = mutable.Set.empty[CharKey]
+  private val recentLevels = mutable.Set.empty[CharLevel]
   private val recentOnline = mutable.Set.empty[CharKey]
   private val currentOnline = mutable.Set.empty[CurrentOnline]
+
   var onlineListTimer = 10
   var onlineListPurgeTimer = 100
 
@@ -42,6 +46,7 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
 
   private val deathRecentDuration = 30 * 60 // 30 minutes for a death to count as recent enough to be worth notifying
   private val onlineRecentDuration = 10 * 60 // 10 minutes for a character to still be checked for deaths after logging off
+  private val recentLevelExpiry = 25 * 60 * 60 // 25 hours before deleting recentLevel entry
 
   private val logAndResumeDecider: Supervision.Decider = { e =>
     logger.error("An exception has occurred in the DeathTrackerStream:", e)
@@ -80,19 +85,23 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
       val guild = char.characters.character.guild
       val guildName = if(!(guild.isEmpty)) guild.head.name else ""
       var guildIcon = Config.noGuild
+      var levelChannel = BotApp.levelsAll
       if (guildName != "") {
         guildIcon = Config.otherGuild
         val allyGuilds = BotApp.allyGuildsList.contains(guildName.toLowerCase())
         if (allyGuilds == true){
+          //levelChannel = BotApp.levelsAllies
           guildIcon = Config.allyGuild
         }
         val huntedGuilds = BotApp.huntedGuildsList.contains(guildName.toLowerCase())
         if (huntedGuilds == true){
+          //levelChannel = BotApp.levelsEnemies
           guildIcon = Config.enemyGuild
         }
       }
       val huntedPlayers = BotApp.huntedPlayersList.contains(charName.toLowerCase())
       if (huntedPlayers == true){
+        //levelChannel = BotApp.levelsEnemies
         if (guildName != "") {
           guildIcon = Config.enemyGuild
         } else {
@@ -101,11 +110,33 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
       }
       val allyPlayers = BotApp.allyPlayersList.contains(charName.toLowerCase())
       if (allyPlayers == true){
+        //levelChannel = BotApp.levelsAllies
         guildIcon = Config.allyGuild
       }
+      // add the guild icon
       currentOnline.find(_.name == charName).foreach { onlinePlayer =>
         currentOnline -= onlinePlayer
         currentOnline += onlinePlayer.copy(guild = guildIcon)
+      }
+      // detecting new levels
+      val sheetLevel = char.characters.character.level
+      val sheetVocation = char.characters.character.vocation
+      val sheetLastLogin = ZonedDateTime.parse(char.characters.character.last_login.getOrElse("2022-01-01T01:00:00Z"))
+      currentOnline.find(_.name == charName).foreach { onlinePlayer =>
+        if (onlinePlayer.level > sheetLevel && now.isAfter(sheetLastLogin.plusMinutes(5))){
+          val newCharLevel = CharLevel(charName, onlinePlayer.level, sheetVocation, sheetLastLogin, now)
+          val webhookMessage = s"${guildIcon} **[$charName](${charUrl(charName)})** advanced to level **${onlinePlayer.level}** ${vocEmoji(char)}"
+          if (recentLevels.exists(x => x.name == charName && x.level == onlinePlayer.level)){
+            val lastLoginInRecentLevels = recentLevels.filter(x => x.name == charName && x.level == onlinePlayer.level)
+              if (lastLoginInRecentLevels.forall(x => x.lastLogin.isBefore(sheetLastLogin))){
+                recentLevels += newCharLevel
+                createAndSendWebhookMessage(levelChannel, webhookMessage, s"${Config.worldChannelsCategory.capitalize}")
+              }
+          } else {
+              recentLevels += newCharLevel
+              createAndSendWebhookMessage(levelChannel, webhookMessage, s"${Config.worldChannelsCategory.capitalize}")
+          }
+        }
       }
 
       val deaths: List[Deaths] = char.characters.deaths.getOrElse(List.empty)
@@ -164,12 +195,69 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
       var exivaBuffer = ListBuffer[String]()
       var exivaList = ""
       val killerList = charDeath.death.killers // get all killers
+
+      // guild rank and name
+      val guild = charDeath.char.characters.character.guild
+      val guildName = if(!(guild.isEmpty)) guild.head.name else ""
+      val guildRank = if(!(guild.isEmpty)) guild.head.rank else ""
+      //var guildText = ":x: **No Guild**\n"
+      var guildText = ""
+
+      // guild
+      // does player have guild?
+      var guildIcon = Config.otherGuild
+      if (guildName != "") {
+        // if untracked neutral guild show grey
+        if (embedColor == 3092790){
+          embedColor = 4540237
+        }
+        // is player an ally
+        val allyGuilds = BotApp.allyGuildsList.contains(guildName.toLowerCase())
+        if (allyGuilds == true){
+          embedColor = 13773097 // bright red
+          guildIcon = Config.allyGuild
+        }
+        // is player in hunted guild
+        val huntedGuilds = BotApp.huntedGuildsList.contains(guildName.toLowerCase())
+        if (huntedGuilds == true){
+          embedColor = 36941 // bright green
+          if (context == "Died" && charDeath.death.level.toInt >= 250) {
+            notablePoke = Config.inqBlessRole // PVE fullbless opportuniy (only poke for level 250+)
+          }
+        }
+        guildText = s"$guildIcon *$guildRank* of the [$guildName](https://www.tibia.com/community/?subtopic=guilds&page=view&GuildName=${guildName.replace(" ", "%20")})\n"
+      }
+
+      // player
+      // ally player
+      val allyPlayers = BotApp.allyPlayersList.contains(charName.toLowerCase())
+      if (allyPlayers == true){
+        embedColor = 13773097 // bright red
+      }
+      // hunted player
+      val huntedPlayers = BotApp.huntedPlayersList.contains(charName.toLowerCase())
+      if (huntedPlayers == true){
+        embedColor = 36941 // bright green
+        if (context == "Died") {
+          notablePoke = Config.inqBlessRole // PVE fullbless opportuniy
+        }
+      }
+
+      // poke if killer is in notable-creatures config
+      val poke = Config.notableCreatures.contains(killer.toLowerCase())
+      if (poke == true) {
+        notablePoke = Config.notableRole
+        embedColor = 11563775 // bright purple
+      }
+
       if (killerList.nonEmpty) {
         killerList.foreach { k =>
           if (k.player == true) {
             if (k.name != charName){ // ignore 'self' entries on deathlist
               context = "Killed"
-              embedColor = 14869218 // bone white
+              if (embedColor == 3092790 || embedColor == 4540237){
+                embedColor = 14869218 // bone white
+              }
               embedThumbnail = creatureImageUrl("Phantasmal_Ooze")
               val isSummon = k.name.split(" of ") // e.g: fire elemental of Violent Beams
               if (isSummon.length > 1){
@@ -183,14 +271,20 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
                   case _ => "a"
                   }
                   killerBuffer += s"$vowel ${Config.summonEmoji} **${isSummon(0)} of [${isSummon(1)}](${charUrl(isSummon(1))})**"
-                  exivaBuffer += isSummon(1)
+                  if (guildIcon == Config.allyGuild) {
+                    exivaBuffer += isSummon(1)
+                  }
                 } else {
                   killerBuffer += s"**[${k.name}](${charUrl(k.name)})**" // player with " of " in the name e.g: Knight of Flame
-                  exivaBuffer += k.name
+                  if (guildIcon == Config.allyGuild) {
+                    exivaBuffer += k.name
+                  }
                 }
               } else {
                 killerBuffer += s"**[${k.name}](${charUrl(k.name)})**" // summon not detected
-                exivaBuffer += k.name
+                if (guildIcon == Config.allyGuild) {
+                  exivaBuffer += k.name
+                }
               }
             }
           } else {
@@ -258,60 +352,6 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
       if (killerText == ""){
           embedThumbnail = creatureImageUrl("Red_Skull_(Item)")
           killerText = s"""`suicide`"""
-      }
-
-      // guild rank and name
-      val guild = charDeath.char.characters.character.guild
-      val guildName = if(!(guild.isEmpty)) guild.head.name else ""
-      val guildRank = if(!(guild.isEmpty)) guild.head.rank else ""
-      //var guildText = ":x: **No Guild**\n"
-      var guildText = ""
-
-      // guild
-      // does player have guild?
-      var guildIcon = Config.otherGuild
-      if (guildName != "") {
-        // if untracked neutral guild show grey
-        if (embedColor == 3092790){
-          embedColor = 4540237
-        }
-        // is player an ally
-        val allyGuilds = BotApp.allyGuildsList.contains(guildName.toLowerCase())
-        if (allyGuilds == true){
-          embedColor = 13773097 // bright red
-          guildIcon = Config.allyGuild
-        }
-        // is player in hunted guild
-        val huntedGuilds = BotApp.huntedGuildsList.contains(guildName.toLowerCase())
-        if (huntedGuilds == true){
-          embedColor = 36941 // bright green
-          if (context == "Died" && charDeath.death.level.toInt >= 250) {
-            notablePoke = Config.inqBlessRole // PVE fullbless opportuniy (only poke for level 250+)
-          }
-        }
-        guildText = s"$guildIcon *$guildRank* of the [$guildName](https://www.tibia.com/community/?subtopic=guilds&page=view&GuildName=${guildName.replace(" ", "%20")})\n"
-      }
-
-      // player
-      // ally player
-      val allyPlayers = BotApp.allyPlayersList.contains(charName.toLowerCase())
-      if (allyPlayers == true){
-        embedColor = 13773097 // bright red
-      }
-      // hunted player
-      val huntedPlayers = BotApp.huntedPlayersList.contains(charName.toLowerCase())
-      if (huntedPlayers == true){
-        embedColor = 36941 // bright green
-        if (context == "Died") {
-          notablePoke = Config.inqBlessRole // PVE fullbless opportuniy
-        }
-      }
-
-      // poke if killer is in notable-creatures config
-      val poke = Config.notableCreatures.contains(killer.toLowerCase())
-      if (poke == true) {
-        notablePoke = Config.notableRole
-        embedColor = 11563775 // bright purple
       }
 
       val epochSecond = ZonedDateTime.parse(charDeath.death.time).toEpochSecond
@@ -459,6 +499,26 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
     }
   }
 
+  // send a webhook to discord (this is used as we can have hyperlinks in Text Messages)
+  def createAndSendWebhookMessage(webhookChannel: TextChannel, messageContent: String, messageAuthor: String): Unit = {
+    val getWebHook = webhookChannel.retrieveWebhooks().submit().get()
+    var webhook: Webhook = null
+    if (getWebHook.isEmpty) {
+        val createWebhook = webhookChannel.createWebhook(messageAuthor).submit()
+        webhook = createWebhook.get()
+    } else {
+        webhook = getWebHook.get(0)
+    }
+    val webhookUrl = webhook.getUrl()
+    val client = WebhookClient.withUrl(webhookUrl)
+    val message = new WebhookMessageBuilder()
+      .setUsername(messageAuthor)
+      .setContent(messageContent)
+      .build()
+    client.send(message)
+    client.close()
+  }
+
   // Remove players from the list who haven't logged in for a while. Remove old saved deaths.
   private def cleanUp(): Unit = {
     val now = ZonedDateTime.now()
@@ -469,6 +529,10 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
     recentDeaths.filterInPlace { i =>
       val diff = java.time.Duration.between(i.time, now).getSeconds
       diff < deathRecentDuration
+    }
+    recentLevels.filterInPlace { i =>
+      val diff = java.time.Duration.between(i.time, now).getSeconds
+      diff < recentLevelExpiry
     }
     currentOnline.clear()
   }

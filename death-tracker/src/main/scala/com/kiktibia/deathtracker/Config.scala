@@ -10,7 +10,6 @@ object Config {
 
   val token: String = discord.getString("token")
   val guildId: String = discord.getString("guild-id")
-  val deathsChannelId: String = discord.getString("deaths-channel-id")
 
   val creatureUrlMappings: Map[String, String] = mappings.getObject("creature-url-mappings").asScala.map {
     case (k, v) => k -> v.unwrapped().toString
@@ -18,7 +17,7 @@ object Config {
 
   // discord config
   val configChannelsCategory: String = discord.getString("config-channels")
-  val onlineChannelsCategory: String = discord.getString("online-channels")
+  val worldChannelsCategory: String = discord.getString("world-channels")
 
   // roles
   val notableRole: String = discord.getString("notable-role")
@@ -45,8 +44,8 @@ object Config {
   val feruEmoji: String = discord.getString("feru-emoji")
   val inqEmoji: String = discord.getString("inq-emoji")
   val kilmareshEmoji: String = discord.getString("kilmaresh-emoji")
-  //val exivaEmoji: String = discord.getString("exiva-emoji")
-  //val indentEmoji: String = discord.getString("indent-emoji") // whitespace/empty emoji
+  val exivaEmoji: String = discord.getString("exiva-emoji")
+  val indentEmoji: String = discord.getString("indent-emoji")
 
   // creature mappings
   val notableCreatures: List[String] = mappings.getStringList("notable-creatures").asScala.toList
