@@ -335,9 +335,9 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
       if (exivaBuffer.nonEmpty) {
         exivaBuffer.zipWithIndex.foreach { case (exiva, i) =>
           if (i == 0){
-            exivaList += s"""\n<:exiva:1025866744918716416> `exiva "$exiva"`""" // add exiva emoji
+            exivaList += s"""\n${Config.exivaEmoji} `exiva "$exiva"`""" // add exiva emoji
           } else {
-            exivaList += s"""\n<:indent:1025915320285798451> `exiva "$exiva"`""" // just use indent emoji for further player names
+            exivaList += s"""\n${Config.indentEmoji} `exiva "$exiva"`""" // just use indent emoji for further player names
           }
         }
       }
