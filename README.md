@@ -1,15 +1,19 @@
 # Discord Bot for Tibia
-
-It is currently configured for [Seanera](https://github.com/Leo32onGIT/death-tracker/blob/main/death-tracker/src/main/scala/com/kiktibia/deathtracker/tibiadata/TibiaDataClient.scala#L20).    
-Current features include an online list and player deaths feed.
+   
+Current features include:    
+- Online List
+- Levels List
+- Deaths List
 
 ### Online player list    
 
-> ![examples](https://i.imgur.com/S72fiHb.png)
+> ![examples](https://i.imgur.com/O4lnDXt.png)
 
-> ![examples](https://i.imgur.com/AkaTy62.png)
+### Levels List
 
-### Death list    
+> ![examples](https://i.imgur.com/OEnUbIJ.png)
+
+### Deaths list    
   
   `no color` = neutral pve    
   `white` = neutral pvp    
@@ -32,19 +36,33 @@ It will poke a [discord role](https://github.com/Leo32onGIT/death-tracker/blob/m
 4. Scroll down and enable **Message Content Intent**.
 
 #### Prepare your Discord for the bot
-1. Create a new category called `configuration`.
-2. Create four channels in it called: `hunted-players`, `hunted-guilds`, `allied-players` & `allied-guilds`.
-3. Create a new category called `online`.
-4. Create three channels in it called: `allies`, `neutrals` & `enemies`.
-5. Ensure the bot has `View Channel`, `Manage Channel`, `Send Messages`, `Manage Messages` & `Read Message History` permissions in these channels.    
-> ![prep example](https://i.imgur.com/jBNicZI.png)
+1. Create a new category with the name of the server this bot is for:    
+`seanera`
+2. Create the following channels in it:    
+`allies`    
+`neutrals`    
+`enemies`    
+`levels`    
+`deaths`
+3. Ensure the bot has the following permissions in these channels:    
+`View Channel`, `Manage Channel`, `Send Messages`, `Manage Messages`, `Manage Webhooks`, `Read Message History`
+4. Create a new category called:    
+`configuration`
+5. Create the following channels in it:   
+`hunted-players`    
+`hunted-guilds`    
+`allied-players`    
+`allied-guilds`
+
+This is what it should look like:
+> ![prep example](https://i.imgur.com/MMRIjys.png)
 
 #### Custom Emojis and Poke Roles
 The bot is configured to point to emojis and roles in _my_ discord server.     
 You will need to change this to point to your emojis and your discord roles.
 
 1. Open the [discord.conf](https://github.com/Leo32onGIT/death-tracker/blob/seanera/death-tracker/src/main/resources/discord.conf#L11-L34) file and edit it.
-2. Point to emoji ids and role ids that exist on _your_ discord server.
+2. Point to `emoji ids` and `role ids` that exist on _your_ discord server.
 
 #### Prepare your linux machine to host the bot
 1. Ensure `docker` is installed.
@@ -53,19 +71,24 @@ You will need to change this to point to your emojis and your discord roles.
 
 ## Deployment Steps
 
-1. Clone the repository to your host machine: `git clone https://github.com/Leo32onGIT/death-tracker.git`
-2. Navigate to the folder that contains the main **build.sbt** file: `cd death-tracker`
-4. Compile the code into a docker image: `sbt docker:publishLocal`
-5. Take note of the docker \<image id\> you just created: `docker images`   
+1. Clone the repository to your host machine:    
+`git clone https://github.com/Leo32onGIT/death-tracker.git`    
+2. Open the [discord.conf](https://github.com/Leo32onGIT/death-tracker/blob/seanera/death-tracker/src/main/resources/discord.conf#L7) file and edit it.
+3. Change `world-channels` to the server you wish to track (it is set to `seanera` by default).
+4. Navigate to the folder that contains the main **build.sbt** file:    
+`cd death-tracker`    
+5. Compile the code into a docker image:    
+`sbt docker:publishLocal`    
+6. Take note of the docker \<image id\> you just created: `docker images`   
 > ![docker image id](https://i.imgur.com/nXvSeIL.png)
 
-4. Create a `prod.env` file with the discord server/channel id & bot authentication token:
+7. Create a `prod.env` file with the discord server/channel id & bot authentication token:
 > ```env
 > TOKEN=XXXXXXXXXXXXXXXXXXXXXX   
 > GUILD_ID=XXXXXXXXXXXXXXXXXXX   
-> DEATHS_CHANNEL_ID=XXXXXXXXXXXXXXXXXXX
 > ```
-5. Run the docker container you just created & parse the **prod.env** file: `docker run --rm -d --env-file prod.env <image_id>`  
+8. Run the docker container you just created & parse the **prod.env** file:    
+`docker run --rm -d --env-file prod.env <image_id>`  
 
 ## Debugging
 
