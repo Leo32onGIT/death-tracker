@@ -54,13 +54,12 @@ You will need to change this to point to your emojis and your discord roles.
 ## Deployment Steps
 
 1. Clone the repository to your host machine: `git clone https://github.com/Leo32onGIT/death-tracker.git`
-2. Navigate tothe  folder that contains the main **build.sbt** file: `cd death-tracker`
-3. Switch to this branch: `git checkout dev`
+2. Navigate to the folder that contains the main **build.sbt** file: `cd death-tracker`
 4. Compile the code into a docker image: `sbt docker:publishLocal`
 5. Take note of the docker \<image id\> you just created: `docker images`   
 > ![docker image id](https://i.imgur.com/nXvSeIL.png)
 
-4. Create an `prod.env` file with the discord server/channel id & bot authentication token:
+4. Create a `prod.env` file with the discord server/channel id & bot authentication token:
 > ```env
 > TOKEN=XXXXXXXXXXXXXXXXXXXXXX   
 > GUILD_ID=XXXXXXXXXXXXXXXXXXX   
