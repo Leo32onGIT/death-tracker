@@ -321,7 +321,7 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
             // ignore capitalized names (nouns) as they are bosses
             // if player dies to a neutral source show 'died by energy' instead of 'died by an energy'
             if (!(k.name.exists(_.isUpper))){
-              val elements = List("death", "earth", "energy", "fire", "ice", "holy", "a trap", "agony", "life drain")
+              val elements = List("death", "earth", "energy", "fire", "ice", "holy", "a trap", "agony", "life drain", "drowning")
               vowelCheck = k.name.take(1) match {
                 case _ if elements.contains(k.name) => ""
                 case "a" => "an "
