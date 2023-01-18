@@ -187,8 +187,8 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
     val embeds = notableDeaths.sortBy(_.death.time).map { charDeath =>
     ***/
 
-    var notablePoke = ""
     val embeds = charDeaths.toList.sortBy(_.death.time).map { charDeath =>
+      var notablePoke = ""
       val charName = charDeath.char.characters.character.name
       val killer = charDeath.death.killers.last.name
       var context = "Died"
