@@ -369,13 +369,19 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
       embed.setDescription(embedText)
       embed.setThumbnail(embedThumbnail)
       embed.setColor(embedColor)
-      embed.build()
 
+      // return embed + poke
+      (embed.build(), notablePoke)
     }
     // Send the embeds one at a time, otherwise some don't get sent if sending a lot at once
     embeds.foreach { embed =>
-      deathsChannel.sendMessageEmbeds(embed).queue()
+      deathsChannel.sendMessageEmbeds(embed._1).queue()
+      if (embed._2 == Config.inqinqBlessRole){
+        deathsChannel.sendMessageEmbeds(embed._1).queue()
+        inqBlessChannel.sendMessage("@here").queue();
+      }
     }
+
     /***
     if (notablePoke != ""){
       deathsChannel.sendMessage(notablePoke).queue();

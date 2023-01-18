@@ -52,6 +52,7 @@ object BotApp extends App with StrictLogging {
   val onlineAllies = getTextChannelFromCategory(worldCategory, "allies") // this is the name of the channels
   val onlineNeutrals = getTextChannelFromCategory(worldCategory, "neutrals")
   val onlineEnemies = getTextChannelFromCategory(worldCategory, "enemies")
+  val inqBlessChannel = getTextChannelFromCategory(worldCategory, "inq-bless")
 
   // levels feed
   val levelsAll = getTextChannelFromCategory(worldCategory, "levels") // this is the name of the channels
