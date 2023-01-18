@@ -376,7 +376,7 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
     // Send the embeds one at a time, otherwise some don't get sent if sending a lot at once
     embeds.foreach { embed =>
       deathsChannel.sendMessageEmbeds(embed._1).queue()
-      if (embed._2 == Config.inqinqBlessRole){
+      if (embed._2 == Config.inqBlessRole){
         inqBlessChannel.sendMessageEmbeds(embed._1).queue()
         inqBlessChannel.sendMessage("@here").queue();
       }
