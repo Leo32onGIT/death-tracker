@@ -183,8 +183,8 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
     val embeds = notableDeaths.sortBy(_.death.time).map { charDeath =>
     ***/
 
-    var notablePoke = ""
     val embeds = charDeaths.toList.sortBy(_.death.time).map { charDeath =>
+      var notablePoke = ""
       val charName = charDeath.char.characters.character.name
       val killer = charDeath.death.killers.last.name
       var context = "Died"
@@ -365,15 +365,19 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
       embed.setDescription(embedText)
       embed.setThumbnail(embedThumbnail)
       embed.setColor(embedColor)
-      embed.build()
+      (embed.build(), notablePoke)
 
     }
     // Send the embeds one at a time, otherwise some don't get sent if sending a lot at once
     embeds.foreach { embed =>
-      deathsChannel.sendMessageEmbeds(embed).queue()
-    }
-    if (notablePoke != ""){
-      deathsChannel.sendMessage(notablePoke).queue();
+      deathsChannel.sendMessageEmbeds(embed._1).queue()
+      if (embed._2 == Config.notableRole){
+        deathsChannel.sendMessage(notablePoke).queue();
+      } else if (embed._2 == Config.inqBlessRole){
+        var inqChannel = BotApp.inqBlessChannel
+        inqChannel.sendMessageEmbeds(embed._1).queue()
+        inqChannel.sendMessage("@here").queue();
+      }
     }
 
     cleanUp()
