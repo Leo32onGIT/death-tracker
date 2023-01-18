@@ -376,9 +376,11 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
     embeds.foreach { embed =>
       deathsChannel.sendMessageEmbeds(embed).queue()
     }
+    /***
     if (notablePoke != ""){
       deathsChannel.sendMessage(notablePoke).queue();
     }
+    ***/
 
     cleanUp()
 
