@@ -377,8 +377,9 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
     embeds.foreach { embed =>
       deathsChannel.sendMessageEmbeds(embed._1).queue()
       if (embed._2 == Config.inqBlessRole){
-        inqBlessChannel.sendMessageEmbeds(embed._1).queue()
-        inqBlessChannel.sendMessage("@here").queue();
+        var inqChannel = BotApp.inqBlessChannel
+        inqChannel.sendMessageEmbeds(embed._1).queue()
+        inqChannel.sendMessage("@here").queue();
       }
     }
 
