@@ -2,7 +2,7 @@ package com.kiktibia.deathtracker
 
 import akka.actor.Cancellable
 import akka.stream.ActorAttributes.supervisionStrategy
-import akka.stream.scaladsl.{Flow, RunnableGraph, Sink, Source}
+import akka.stream.scaladsl.{Flow, RunnableGraph, Sink, Source, Keep}
 import akka.stream.{Attributes, Materializer, Supervision}
 import com.kiktibia.deathtracker.tibiadata.TibiaDataClient
 import com.kiktibia.deathtracker.tibiadata.response.{CharacterResponse, Deaths, WorldResponse}
@@ -16,7 +16,8 @@ import net.dv8tion.jda.api.entities.Guild
 import scala.collection.immutable.ListMap
 import club.minnced.discord.webhook.WebhookClient
 import club.minnced.discord.webhook.send.WebhookMessageBuilder
-
+import scala.util.Success
+import scala.util.Failure
 import java.time.ZonedDateTime
 import scala.collection.immutable.HashMap
 import scala.collection.mutable
@@ -341,7 +342,47 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
             exivaList += s"""\n${Config.indentEmoji} `exiva "$exiva"`""" // just use indent emoji for further player names
           }
         }
+
+        // add enemies to hunted list
+        var huntedBuffer = ListBuffer[String]()
+        val exivaBufferFlow = Source(exivaBuffer.toSet).mapAsyncUnordered(16)(tibiaDataClient.getCharacter).toMat(Sink.seq)(Keep.right)
+        val futureResults: Future[Seq[CharacterResponse]] = exivaBufferFlow.run()
+
+        futureResults.onComplete {
+          case Success(output) => {
+            output.foreach { charResponse =>
+              val killerName = charResponse.characters.character.name
+              val killerGuild = charResponse.characters.character.guild
+              val killerGuildName = if(!(killerGuild.isEmpty)) killerGuild.head.name else ""
+              var guildCheck = true
+              if (killerGuildName != ""){
+                if (BotApp.allyGuildsList.contains(killerGuildName.toLowerCase()) || BotApp.huntedGuildsList.contains(killerGuildName.toLowerCase())){
+                  guildCheck = false // player guild is already ally/hunted
+                }
+              }
+              if (guildCheck == true){ // player is not in a guild or is in a guild that is not tracked
+                if (BotApp.allyPlayersList.contains(killerName.toLowerCase()) || BotApp.huntedPlayersList.contains(killerName.toLowerCase())){
+                  // char is already on ally/hunted list
+                } else {
+                  // add them to hunted list
+                  huntedBuffer += killerName
+                }
+              }
+            }
+          }
+          case Failure(e) => e.printStackTrace
+        }
+        // consume the list
+        if (huntedBuffer.nonEmpty){
+          // post the message to discord
+          val huntedList = huntedBuffer.mkString("\n")
+          BotApp.huntedPlayersChannel.sendMessage(huntedList).queue()
+          // update the hunted list
+          val newHuntedList = BotApp.huntedPlayersList ++ huntedBuffer.toList
+          BotApp.huntedPlayersList = newHuntedList
+        }
       }
+
       // convert formatted killer list to one string
       val killerInit = if (killerBuffer.nonEmpty) killerBuffer.view.init else None
       var killerText =

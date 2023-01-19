@@ -37,7 +37,7 @@ object BotApp extends App with StrictLogging {
 
   // hunted/ally players and Guilds
   val configCategory = getCategoryByName(Config.configChannelsCategory) // this is the name of the 'category' containing the channels
-  private val huntedPlayersChannel = getTextChannelFromCategory(configCategory, "hunted-players") // this is the name of the channels
+  val huntedPlayersChannel = getTextChannelFromCategory(configCategory, "hunted-players") // this is the name of the channels
   private val huntedGuildsChannel = getTextChannelFromCategory(configCategory, "hunted-guilds")
   private val allyPlayersChannel = getTextChannelFromCategory(configCategory, "allied-players")
   private val allyGuildsChannel = getTextChannelFromCategory(configCategory, "allied-guilds")
@@ -62,11 +62,16 @@ object BotApp extends App with StrictLogging {
   // get all messages (max 100) from these channels to compile into the lists
   def getMessagesInChannel(channel: TextChannel): List[String] = {
     val messageHistory = channel.getHistory
-    val messages = messageHistory.retrievePast(100).complete()
+    var messages = List.empty[Message]
+    var retrieved = messageHistory.retrievePast(100).complete()
+    while (!retrieved.isEmpty) {
+      messages = messages ++ retrieved.asScala
+      retrieved = messageHistory.retrievePast(100).complete()
+    }
     if (messages.isEmpty) {
       List.empty
     } else {
-      messages.asScala.toList.flatMap { message =>
+      messages.flatMap { message =>
         message.getContentRaw().toLowerCase().replaceAll("`","").trim().split("\n").toList
       }
     }
