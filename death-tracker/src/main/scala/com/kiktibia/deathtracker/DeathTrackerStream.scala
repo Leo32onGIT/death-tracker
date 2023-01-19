@@ -370,16 +370,18 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
     }
     // Send the embeds one at a time, otherwise some don't get sent if sending a lot at once
     embeds.foreach { embed =>
-      deathsChannel.sendMessageEmbeds(embed._1.build()).queue()
+      // nemesis creatures
       if (embed._2 == Config.notableRole){
-        deathsChannel.sendMessage(embed._2).queue();
+        deathsChannel.sendMessage(embed._2).setEmbeds(embed._1.build()).queue();
       } else if (embed._2 == Config.inqBlessRole){
         // send adjusted embed to fullbless channel
         var inqChannel = BotApp.inqBlessChannel
         val adjustedMessage = embed._4 + s"""\n${Config.exivaEmoji} `exiva "${embed._3}"`"""
         val adjustedEmbed = embed._1.setDescription(adjustedMessage)
-        inqChannel.sendMessageEmbeds(adjustedEmbed.build()).queue()
-        inqChannel.sendMessage("@here").queue();
+        inqChannel.sendMessage("@here").setEmbeds(adjustedEmbed.build()).queue();
+      } else {
+        // regular death
+        deathsChannel.sendMessageEmbeds(embed._1.build()).queue()
       }
     }
 
