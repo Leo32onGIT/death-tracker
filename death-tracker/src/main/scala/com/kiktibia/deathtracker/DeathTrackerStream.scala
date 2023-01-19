@@ -425,10 +425,9 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
         val adjustedMessage = embed._4 + s"""\n${Config.exivaEmoji} `exiva "${embed._3}"`"""
         val adjustedEmbed = embed._1.setDescription(adjustedMessage)
         inqChannel.sendMessage("@here").setEmbeds(adjustedEmbed.build()).queue();
-      } else {
-        // regular death
-        deathsChannel.sendMessageEmbeds(embed._1.build()).queue()
       }
+      // regular death
+      deathsChannel.sendMessageEmbeds(embed._1.build()).queue()
     }
     /***
     if (notablePoke != ""){
