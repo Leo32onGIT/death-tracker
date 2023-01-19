@@ -371,18 +371,22 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
       embed.setColor(embedColor)
 
       // return embed + poke
-      (embed.build(), notablePoke)
+      (embed, notablePoke, charName, embedText)
+
     }
     // Send the embeds one at a time, otherwise some don't get sent if sending a lot at once
     embeds.foreach { embed =>
-      deathsChannel.sendMessageEmbeds(embed._1).queue()
       if (embed._2 == Config.inqBlessRole){
+        // send adjusted embed to fullbless channel
         var inqChannel = BotApp.inqBlessChannel
-        inqChannel.sendMessageEmbeds(embed._1).queue()
-        inqChannel.sendMessage("@here").queue();
+        val adjustedMessage = embed._4 + s"""\n${Config.exivaEmoji} `exiva "${embed._3}"`"""
+        val adjustedEmbed = embed._1.setDescription(adjustedMessage)
+        inqChannel.sendMessage("@here").setEmbeds(adjustedEmbed.build()).queue();
+      } else {
+        // regular death
+        deathsChannel.sendMessageEmbeds(embed._1.build()).queue()
       }
     }
-
     /***
     if (notablePoke != ""){
       deathsChannel.sendMessage(notablePoke).queue();
