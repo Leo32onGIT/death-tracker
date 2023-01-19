@@ -347,13 +347,12 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
           }
         }
 
-        // add enemies to hunted list
-        var huntedBuffer = ListBuffer[String]()
+        // scan exiva list for enemies to be added to hunted
         val exivaBufferFlow = Source(exivaBuffer.toSet).mapAsyncUnordered(16)(tibiaDataClient.getCharacter).toMat(Sink.seq)(Keep.right)
         val futureResults: Future[Seq[CharacterResponse]] = exivaBufferFlow.run()
-
         futureResults.onComplete {
           case Success(output) => {
+            var huntedBuffer = ListBuffer[String]()
             output.foreach { charResponse =>
               val killerName = charResponse.characters.character.name
               val killerGuild = charResponse.characters.character.guild
@@ -366,24 +365,27 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
               }
               if (guildCheck == true){ // player is not in a guild or is in a guild that is not tracked
                 if (BotApp.allyPlayersList.contains(killerName.toLowerCase()) || BotApp.huntedPlayersList.contains(killerName.toLowerCase())){
-                  // char is already on ally/hunted list
+                  // char is already on ally/hunted lis
                 } else {
-                  // add them to hunted list
-                  huntedBuffer += killerName
+                  // char is not on hunted list
+                  if (!huntedBuffer.contains(killerName)){
+                    // add them to hunted list
+                    huntedBuffer += killerName
+                  }
                 }
               }
             }
+            // process the new batch of players to add to hunted list
+            if (huntedBuffer.nonEmpty){
+              // post the message to discord
+              val huntedList = huntedBuffer.mkString("\n")
+              BotApp.huntedPlayersChannel.sendMessage(huntedList).queue()
+              // update the internal hunted players cache
+              val newHuntedList = BotApp.huntedPlayersList ++ huntedBuffer.map(_.toLowerCase).toList
+              BotApp.huntedPlayersList = newHuntedList
+            }
           }
           case Failure(e) => e.printStackTrace
-        }
-        // consume the list
-        if (huntedBuffer.nonEmpty){
-          // post the message to discord
-          val huntedList = huntedBuffer.mkString("\n")
-          BotApp.huntedPlayersChannel.sendMessage(huntedList).queue()
-          // update the hunted list
-          val newHuntedList = BotApp.huntedPlayersList ++ huntedBuffer.toList
-          BotApp.huntedPlayersList = newHuntedList
         }
       }
 
