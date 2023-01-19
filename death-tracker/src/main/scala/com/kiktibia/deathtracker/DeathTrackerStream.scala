@@ -416,15 +416,16 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
       // nemesis creatures
       if (embed._2 == Config.notableRole){
         deathsChannel.sendMessage(embed._2).setEmbeds(embed._1.build()).queue();
-      } else if (embed._2 == Config.inqBlessRole){
+      } else {
+        // regular death
+        deathsChannel.sendMessageEmbeds(embed._1.build()).queue()
+      }
+      if (embed._2 == Config.inqBlessRole){
         // send adjusted embed to fullbless channel
         var inqChannel = BotApp.inqBlessChannel
         val adjustedMessage = embed._4 + s"""\n${Config.exivaEmoji} `exiva "${embed._3}"`"""
         val adjustedEmbed = embed._1.setDescription(adjustedMessage)
         inqChannel.sendMessage("@here").setEmbeds(adjustedEmbed.build()).queue();
-      } else {
-        // regular death
-        deathsChannel.sendMessageEmbeds(embed._1.build()).queue()
       }
     }
 
