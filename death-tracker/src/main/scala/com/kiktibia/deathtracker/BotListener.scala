@@ -15,7 +15,7 @@ class BotListener extends ListenerAdapter {
   }
 
   private def handleEvent(event: SlashCommandInteractionEvent): Unit = {
-    val embed = BotApp.reload()
-		event.replyEmbeds(embed).queue()
+    val embed = BotApp.reload(true)
+		event.replyEmbeds(embed.get).queue()
   }
 }

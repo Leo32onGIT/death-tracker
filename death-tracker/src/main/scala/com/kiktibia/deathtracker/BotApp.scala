@@ -35,17 +35,18 @@ object BotApp extends App with StrictLogging {
 
   private val guild: Guild = jda.getGuildById(Config.guildId)
 
+  // initialize hunted lists
+  var huntedPlayersList = List.empty[String]
+  var huntedGuildsList = List.empty[String]
+  var allyPlayersList = List.empty[String]
+  var allyGuildsList = List.empty[String]
+
   // hunted/ally players and Guilds
   val configCategory = getCategoryByName(Config.configChannelsCategory) // this is the name of the 'category' containing the channels
   val huntedPlayersChannel = getTextChannelFromCategory(configCategory, "hunted-players") // this is the name of the channels
   private val huntedGuildsChannel = getTextChannelFromCategory(configCategory, "hunted-guilds")
   private val allyPlayersChannel = getTextChannelFromCategory(configCategory, "allied-players")
   private val allyGuildsChannel = getTextChannelFromCategory(configCategory, "allied-guilds")
-
-  var huntedPlayersList = getMessagesInChannel(huntedPlayersChannel)
-  var huntedGuildsList = getMessagesInChannel(huntedGuildsChannel)
-  var allyPlayersList = getMessagesInChannel(allyPlayersChannel)
-  var allyGuildsList = getMessagesInChannel(allyGuildsChannel)
 
   // online list
   val worldCategory = getCategoryByName(Config.worldChannelsCategory) // this is the name of the category' containing the channels
@@ -97,25 +98,30 @@ object BotApp extends App with StrictLogging {
     targetChannel
   }
 
-  def reload(): MessageEmbed = {
-    logger.info("reload command has been called")
+  def reload(slash: Boolean = false): Option[MessageEmbed] = {
 
     huntedPlayersList = getMessagesInChannel(huntedPlayersChannel)
     huntedGuildsList = getMessagesInChannel(huntedGuildsChannel)
     allyPlayersList = getMessagesInChannel(allyPlayersChannel)
     allyGuildsList = getMessagesInChannel(allyGuildsChannel)
 
+    /***
     logger.info(s"Hunted Players: ${huntedPlayersList.toString}")
     logger.info(s"Hunted Guilds: ${huntedGuildsList.toString}")
     logger.info(s"Allied Players: ${allyPlayersList.toString}")
     logger.info(s"Allied Guilds: ${allyGuildsList.toString}")
+    ***/
+    
+    if (slash) {
+      val embed = new EmbedBuilder()
+      val embedText = s":gear: player & guild config has been reloaded."
 
-    val embed = new EmbedBuilder()
-    val embedText = s":gear: player & guild config has been reloaded."
-
-    embed.setColor(3092790)
-    embed.setDescription(embedText)
-    embed.build()
+      embed.setColor(3092790)
+      embed.setDescription(embedText)
+      Some(embed.build())
+    } else {
+      None
+    }
   }
 
   deathTrackerStream.stream.run()
