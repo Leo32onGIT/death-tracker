@@ -79,9 +79,15 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
 
   private lazy val scanForDeaths = Flow[Set[CharacterResponse]].mapAsync(1) { characterResponses =>
     val now = ZonedDateTime.now()
-    val newDeaths = characterResponses.flatMap { char =>
+    onlineListTimer += 1
 
-      // gather guild icons data for online player list
+    // populate the hunted list
+    if (onlineListTimer >= 10){
+       BotApp.reload()
+    }
+
+    // gather guild icons data for online player list
+    val newDeaths = characterResponses.flatMap { char =>
       val charName = char.characters.character.name
       val guild = char.characters.character.guild
       val guildName = if(!(guild.isEmpty)) guild.head.name else ""
@@ -154,7 +160,6 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
     }
 
     // update online list
-    onlineListTimer += 1
     if (onlineListTimer >= 10) {
       onlineListTimer = 0
       val currentOnlineList: List[(String, Int, String, String)] = currentOnline.map { onlinePlayer =>
