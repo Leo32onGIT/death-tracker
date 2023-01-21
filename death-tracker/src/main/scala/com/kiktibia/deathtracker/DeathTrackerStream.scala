@@ -80,12 +80,10 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
   private lazy val scanForDeaths = Flow[Set[CharacterResponse]].mapAsync(1) { characterResponses =>
     val now = ZonedDateTime.now()
     onlineListTimer += 1
-
     // populate the hunted list
     if (onlineListTimer >= 10){
        BotApp.reload()
     }
-
     // gather guild icons data for online player list
     val newDeaths = characterResponses.flatMap { char =>
       val charName = char.characters.character.name
@@ -126,31 +124,40 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
         currentOnline += onlinePlayer.copy(guild = guildIcon)
       }
       // detecting new levels
+      val deaths: List[Deaths] = char.characters.deaths.getOrElse(List.empty)
       val sheetLevel = char.characters.character.level
       val sheetVocation = char.characters.character.vocation
       val sheetLastLogin = ZonedDateTime.parse(char.characters.character.last_login.getOrElse("2022-01-01T01:00:00Z"))
-      currentOnline.find(_.name == charName).foreach { onlinePlayer =>
-        if (onlinePlayer.level > sheetLevel && now.isAfter(sheetLastLogin.plusMinutes(5))){
-          val newCharLevel = CharLevel(charName, onlinePlayer.level, sheetVocation, sheetLastLogin, now)
-          val webhookMessage = s"${guildIcon} **[$charName](${charUrl(charName)})** advanced to level **${onlinePlayer.level}** ${vocEmoji(char)}"
-          if (recentLevels.exists(x => x.name == charName && x.level == onlinePlayer.level)){
-            val lastLoginInRecentLevels = recentLevels.filter(x => x.name == charName && x.level == onlinePlayer.level)
-              if (lastLoginInRecentLevels.forall(x => x.lastLogin.isBefore(sheetLastLogin))){
-                recentLevels += newCharLevel
-                if (guildIcon != Config.noGuild && guildIcon != Config.otherGuild) { // i dont want to poke neutral levels on this server
+      var recentlyDied = false
+      if (deaths.nonEmpty){
+        val mostRecentDeath = deaths.maxBy(death => ZonedDateTime.parse(death.time))
+        val mostRecentDeathTime = ZonedDateTime.parse(mostRecentDeath.time)
+        val mostRecentDeathAge = java.time.Duration.between(mostRecentDeathTime, now).getSeconds
+        if (mostRecentDeathAge <= 600){
+          recentlyDied = true
+        }
+      }
+      if (!(recentlyDied)) {
+        currentOnline.find(_.name == charName).foreach { onlinePlayer =>
+          if (onlinePlayer.level > sheetLevel){
+            val newCharLevel = CharLevel(charName, onlinePlayer.level, sheetVocation, sheetLastLogin, now)
+            val webhookMessage = s"${guildIcon} **[$charName](${charUrl(charName)})** advanced to level **${onlinePlayer.level}** ${vocEmoji(char)}"
+            if (recentLevels.exists(x => x.name == charName && x.level == onlinePlayer.level)){
+              val lastLoginInRecentLevels = recentLevels.filter(x => x.name == charName && x.level == onlinePlayer.level)
+                if (lastLoginInRecentLevels.forall(x => x.lastLogin.isBefore(sheetLastLogin))){
+                  recentLevels += newCharLevel
                   createAndSendWebhookMessage(levelChannel, webhookMessage, s"${Config.worldChannelsCategory.capitalize}")
                 }
-              }
-          } else {
+            } else {
               recentLevels += newCharLevel
               if (guildIcon != Config.noGuild && guildIcon != Config.otherGuild) { // i dont want to poke neutral levels on this server
                 createAndSendWebhookMessage(levelChannel, webhookMessage, s"${Config.worldChannelsCategory.capitalize}")
               }
+            }
           }
         }
       }
-
-      val deaths: List[Deaths] = char.characters.deaths.getOrElse(List.empty)
+      // parsing death info
       deaths.flatMap { death =>
         val deathTime = ZonedDateTime.parse(death.time)
         val deathAge = java.time.Duration.between(deathTime, now).getSeconds
@@ -161,8 +168,8 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
         }
         else None
       }
-    }
 
+    }
     // update online list
     if (onlineListTimer >= 10) {
       onlineListTimer = 0
@@ -171,7 +178,6 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
       }.toList
       onlineList(currentOnlineList)
     }
-
     Future.successful(newDeaths)
   }.withAttributes(logAndResume)
 
