@@ -87,38 +87,19 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
     // gather guild icons data for online player list
     val newDeaths = characterResponses.flatMap { char =>
       val charName = char.characters.character.name
-      val guild = char.characters.character.guild
-      val guildName = if(!(guild.isEmpty)) guild.head.name else ""
-      var guildIcon = Config.noGuild
-      var levelChannel = BotApp.levelsAll
-      if (guildName != "") {
-        guildIcon = Config.otherGuild
-        val allyGuilds = BotApp.allyGuildsList.contains(guildName.toLowerCase())
-        if (allyGuilds == true){
-          //levelChannel = BotApp.levelsAllies
-          guildIcon = Config.allyGuild
-        }
-        val huntedGuilds = BotApp.huntedGuildsList.contains(guildName.toLowerCase())
-        if (huntedGuilds == true){
-          //levelChannel = BotApp.levelsEnemies
-          guildIcon = Config.enemyGuild
-        }
+      val guildName = char.characters.character.guild.headOption.map(_.name).getOrElse("")
+      val allyGuildCheck = BotApp.allyGuildsList.contains(guildName.toLowerCase())
+      val huntedGuildCheck = BotApp.huntedGuildsList.contains(guildName.toLowerCase())
+      val allyPlayerCheck = BotApp.allyPlayersList.contains(charName.toLowerCase())
+      val huntedPlayerCheck = BotApp.huntedPlayersList.contains(charName.toLowerCase())
+      val guildIcon = (guildName, allyGuildCheck, huntedGuildCheck, allyPlayerCheck, huntedPlayerCheck) match {
+        case (_, true, _, _, _) => Config.allyGuild // allied-guilds
+        case (_, _, true, _, _) => Config.enemyGuild // hunted-guilds
+        case (_, _, _, true, _) => Config.allyGuild // allied-players
+        case (_, _, _, _, true) => Config.enemy // hunted-players
+        case ("", _, _, _, _) => Config.noGuild // no guild (not ally or hunted)
+        case _ => Config.otherGuild // guild (not ally or hunted)
       }
-      val huntedPlayers = BotApp.huntedPlayersList.contains(charName.toLowerCase())
-      if (huntedPlayers == true){
-        //levelChannel = BotApp.levelsEnemies
-        if (guildName != "") {
-          guildIcon = Config.enemyGuild
-        } else {
-          guildIcon = Config.enemy
-        }
-      }
-      val allyPlayers = BotApp.allyPlayersList.contains(charName.toLowerCase())
-      if (allyPlayers == true){
-        //levelChannel = BotApp.levelsAllies
-        guildIcon = Config.allyGuild
-      }
-      // add the guild icon
       currentOnline.find(_.name == charName).foreach { onlinePlayer =>
         currentOnline -= onlinePlayer
         currentOnline += onlinePlayer.copy(guild = guildIcon)
@@ -146,11 +127,11 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
               val lastLoginInRecentLevels = recentLevels.filter(x => x.name == charName && x.level == onlinePlayer.level)
               if (lastLoginInRecentLevels.forall(x => x.lastLogin.isBefore(sheetLastLogin))){
                 recentLevels += newCharLevel
-                createAndSendWebhookMessage(levelChannel, webhookMessage, s"${Config.worldChannelsCategory.capitalize}")
+                createAndSendWebhookMessage(BotApp.levelsAll, webhookMessage, s"${Config.worldChannelsCategory.capitalize}")
               }
             } else {
               recentLevels += newCharLevel
-              createAndSendWebhookMessage(levelChannel, webhookMessage, s"${Config.worldChannelsCategory.capitalize}")
+              createAndSendWebhookMessage(BotApp.levelsAll, webhookMessage, s"${Config.worldChannelsCategory.capitalize}")
             }
           }
         }
@@ -180,23 +161,6 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
   }.withAttributes(logAndResume)
 
   private lazy val postToDiscordAndCleanUp = Flow[Set[CharDeath]].mapAsync(1) { charDeaths =>
-
-    /***
-    // Filter only the interesting deaths (nemesis bosses, rare bestiary)
-    val (notableDeaths, normalDeaths) = charDeaths.toList.partition { charDeath =>
-      Config.notableCreatures.exists(c => c.endsWith(charDeath.death.killers.last.name.toLowerCase))
-    }
-
-    // logging
-    logger.info(s"New notable deaths: ${notableDeaths.length}")
-    notableDeaths.foreach(d => logger.info(s"${d.char.characters.character.name} - ${d.death.killers.last.name}"))
-    logger.info(s"New normal deaths: ${normalDeaths.length}")
-    normalDeaths.foreach(d => logger.info(s"${d.char.characters.character.name} - ${d.death.killers.last.name}"))
-
-
-    val embeds = notableDeaths.sortBy(_.death.time).map { charDeath =>
-    ***/
-
     val embeds = charDeaths.toList.sortBy(_.death.time).map { charDeath =>
       var notablePoke = ""
       val charName = charDeath.char.characters.character.name
@@ -211,9 +175,8 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
       val killerList = charDeath.death.killers // get all killers
 
       // guild rank and name
-      val guild = charDeath.char.characters.character.guild
-      val guildName = if(!(guild.isEmpty)) guild.head.name else ""
-      val guildRank = if(!(guild.isEmpty)) guild.head.rank else ""
+      val guildName = charDeath.char.characters.character.guild.headOption.map(_.name).getOrElse("")
+      val guildRank = charDeath.char.characters.character.guild.headOption.map(_.rank).getOrElse("")
       //var guildText = ":x: **No Guild**\n"
       var guildText = ""
 
@@ -447,7 +410,6 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
     Future.successful()
   }.withAttributes(logAndResume)
 
-  //
   private def onlineList(onlineData: List[(String, Int, String, String)]) {
 
     val vocationBuffers = ListMap(
