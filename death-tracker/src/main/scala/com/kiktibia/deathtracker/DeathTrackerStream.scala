@@ -200,8 +200,8 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
         val huntedGuilds = BotApp.huntedGuildsList.contains(guildName.toLowerCase())
         if (huntedGuilds == true){
           embedColor = 36941 // bright green
-          if (context == "Died" && charDeath.death.level.toInt >= 250) {
-            notablePoke = Config.inqBlessRole // PVE fullbless opportuniy (only poke for level 250+)
+          if (context == "Died") {
+            notablePoke = Config.inqBlessRole // PVE fullbless opportuniy (only poke for level 400+)
           }
         }
         guildText = s"$guildIcon *$guildRank* of the [$guildName](https://www.tibia.com/community/?subtopic=guilds&page=view&GuildName=${guildName.replace(" ", "%20")})\n"
@@ -388,7 +388,7 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
       embed.setColor(embedColor)
 
       // return embed + poke
-      (embed, notablePoke, charName, embedText)
+      (embed, notablePoke, charName, embedText, charDeath.death.level.toInt)
 
     }
     // Send the embeds one at a time, otherwise some don't get sent if sending a lot at once
@@ -400,7 +400,11 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
         var inqChannel = BotApp.inqBlessChannel
         val adjustedMessage = embed._4 + s"""\n${Config.exivaEmoji} `exiva "${embed._3}"`"""
         val adjustedEmbed = embed._1.setDescription(adjustedMessage)
-        inqChannel.sendMessage("@here").setEmbeds(adjustedEmbed.build()).queue();
+        if (embed._5 >= 400)
+          inqChannel.sendMessage("@here").setEmbeds(adjustedEmbed.build()).queue();
+        else {
+          inqChannel.sendMessageEmbeds(adjustedEmbed.build()).queue()
+        }
       }
     }
     /***
