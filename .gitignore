@@ -133,3 +133,5 @@ dmypy.json
 .metals/metals.lock.db
 death-tracker/prod.env
 death-tracker/dev.ps1
+*.ps1
+*.env
