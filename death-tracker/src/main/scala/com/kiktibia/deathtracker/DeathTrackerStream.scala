@@ -97,7 +97,7 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
         case (_, _, true, _, _) => Config.enemyGuild // hunted-guilds
         case (_, _, _, true, _) => Config.allyGuild // allied-players
         case (_, _, _, _, true) => Config.enemy // hunted-players
-        case ("", _, _, _, _) => Config.noGuild // no guild (not ally or hunted)
+        case ("", _, _, _, _) => "" // no guild (not ally or hunted)
         case _ => Config.otherGuild // guild (not ally or hunted)
       }
       currentOnline.find(_.name == charName).foreach { onlinePlayer =>
@@ -122,7 +122,7 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
         currentOnline.find(_.name == charName).foreach { onlinePlayer =>
           if (onlinePlayer.level > sheetLevel){
             val newCharLevel = CharLevel(charName, onlinePlayer.level, sheetVocation, sheetLastLogin, now)
-            val webhookMessage = s"${guildIcon} **[$charName](${charUrl(charName)})** advanced to level **${onlinePlayer.level}** ${vocEmoji(char)}"
+            val webhookMessage = s"${vocEmoji(char)} **[$charName](${charUrl(charName)})** advanced to level **${onlinePlayer.level}** ${guildIcon}"
             if (recentLevels.exists(x => x.name == charName && x.level == onlinePlayer.level)){
               val lastLoginInRecentLevels = recentLevels.filter(x => x.name == charName && x.level == onlinePlayer.level)
               if (lastLoginInRecentLevels.forall(x => x.lastLogin.isBefore(sheetLastLogin))){
@@ -437,11 +437,11 @@ class DeathTrackerStream(deathsChannel: TextChannel)(implicit ex: ExecutionConte
         case "none" => ":hatching_chick:"
         case _ => ""
       }
-      vocationBuffers(voc) += ((s"${player._4}", s"${player._4} **[${player._1}](${charUrl(player._1)})** — Level ${player._2.toString} $vocEmoji"))
+      vocationBuffers(voc) += ((s"${player._4}", s"$vocEmoji ${player._2.toString} — **[${player._1}](${charUrl(player._1)})** ${player._4}"))
     }
 
     val alliesList: List[String] = vocationBuffers.values.flatMap(_.filter(_._1 == s"${Config.allyGuild}").map(_._2)).toList
-    val neutralsList: List[String] = vocationBuffers.values.flatMap(_.filter { case (first, _) => first == s"${Config.otherGuild}" || first == s"${Config.noGuild}" }.map(_._2)).toList
+    val neutralsList: List[String] = vocationBuffers.values.flatMap(_.filter { case (first, _) => first == s"${Config.otherGuild}" || first == "" }.map(_._2)).toList
     val enemiesList: List[String] = vocationBuffers.values.flatMap(_.filter { case (first, _) => first == s"${Config.enemyGuild}" || first == s"${Config.enemy}" }.map(_._2)).toList
 
     val alliesCount = alliesList.size
