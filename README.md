@@ -1,8 +1,7 @@
 # Archive Note
 This code was my personal-use discord bot.    
 It now exists as **Violent Bot** that you can just invite to your own discord server:
-* [Bot Invite Link](https://discord.com/api/oauth2/authorize?client_id=1067774715407642624&permissions=805776400&scope=bot)      
-* [Bot Help & Support](https://discord.gg/E3PJ7Tu7MU)
+> https://violentbot.xyz
 
 I am not publically advertising this bot yet as I focus on building more and more features into it.    
 You are still welcome to use it & provide feedback :)
